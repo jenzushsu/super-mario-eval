@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "super-mario-eval"
+version = "0.1.0"
+description = "Side-by-side TypeSafe Jev and Zoom Decisions Mario evaluation"
+requires-python = ">=3.13"
+dependencies = [
+  "typesafe-mario[mario] @ git+https://github.com/fhshaik/typesafe-mario.git@ca22449ed187118d19326d1f54b01b6636578aa4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.9"]
+
+[project.scripts]
+mario-eval = "mario_eval.cli:main"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mario_eval"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
