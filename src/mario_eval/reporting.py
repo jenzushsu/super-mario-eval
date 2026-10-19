@@ -13,7 +13,7 @@ from threading import Lock
 from uuid import uuid4
 
 from .rankers import PROMPT_VERSION
-from .simulation import ACTION_SET
+from .simulation import ACTION_SET, EVIDENCE_VERSION
 
 SCHEMA = "mario-eval-assisted-v1"
 
@@ -44,6 +44,7 @@ def provenance():
         "python": platform.python_version(),
         "dependencies": packages,
         "action_set": ACTION_SET,
+        "evidence_version": EVIDENCE_VERSION,
         "prompt_version": PROMPT_VERSION,
         "reference": "4esv/jev-mario@8459bbb476c73463d9d3389639c158ecca4e21b4 (methodology only)",
     }
@@ -171,8 +172,8 @@ def report(path, rows, track, offline, shared_validation=None):
         "",
         "Counts describe original model/policy selections, before any survival guard; not observed future deaths or model accuracy.",
         "",
-        "| Policy | Immediate death | All tested follow-ups fatal | Unknown outcome | Incomplete follow-ups | Non-forward | Repeated no progress | Guard overrides |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| Policy | Immediate death | All tested follow-ups fatal | Unknown outcome | Incomplete follow-ups | Non-forward | Repeated no progress | Repeated area choice | Missed surviving progress | Guard overrides |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for item in aggregate:
         d = item["diagnostics"]
@@ -185,6 +186,8 @@ def report(path, rows, track, offline, shared_validation=None):
                 "incomplete_followup_coverage",
                 "zero_progress",
                 "repeated_no_progress",
+                "repeated_area_choice",
+                "missed_surviving_progress",
                 "survival_guard_overrides",
             )
         ]
@@ -193,6 +196,7 @@ def report(path, rows, track, offline, shared_validation=None):
         "",
         "Repeated no progress means selecting nonpositive displacement after at least one horizon without a new best x. Retreats can trigger it; it is not an automatic override.",
         "Complete follow-up coverage tests all seven moves for one horizon only; it does not prove eventual safety. Depth zero is explicitly untested.",
+        "Repeated area choice means the same move already failed to gain a new best x at least twice near this position in the last 12 completed decisions. Area matches are approximate, not identical emulator states. Missed surviving progress means the selected route's best surviving two-move endpoint does not exceed best x while another does. These are signals, not automatic overrides.",
     ]
     if any(row.get("survival_guard", False) for row in rows):
         lines += [

@@ -95,3 +95,31 @@ old corpora require recapture because canonical evidence changed.
 - The guard is off by default, applies equally to all paused assisted lanes,
   and is rejected for other tracks. Guarded results must remain separate from
   raw provider comparisons. See [the detailed analysis](zoom-survival-review.md).
+
+## Progress summaries and decision-cycle evidence
+
+`outcome-ranker-v5` and `evidence_version: progress-cycles-v1` expose the best
+surviving two-move displacement, endpoint, gain beyond best x, and associated
+follow-ups to both providers. A bounded history of 12 actually applied macros
+records repeated area/action attempts without contaminating exploration branches.
+Area matches are approximate (x/y within four pixels, grounded/power status),
+not claims of identical emulator states. No automatic progress override is added.
+
+The new fixture reconstructs Zoom attempt 5 from the supplied five-attempt batch:
+
+- At decision 26, hop plus jump has 79 pixels of surviving two-move progress;
+  jump has 48 and no surviving forward follow-up.
+- Before decision 33, three earlier walks in the same area gained no new best x.
+- Exploration and checkpoint restoration preserve actual decision history.
+- Corpus validation reconstructs retained macro boundaries and results from
+  prefix controls, and detects altered history. Pre-v5 corpora need recapture;
+  old episode logs remain replayable.
+- Provider envelopes contain identical canonical evidence and per-choice data.
+
+These checks validate the new evidence, not a new model win rate. The preceding
+live batch cleared 4/5 for Zoom and 3/5 for Jev with zero guard overrides; it used
+v4, so it is a baseline rather than a measurement of this change.
+
+Validation: **89 tests passed**; lint, formatting, and whitespace checks passed.
+An uploaded v4 winning Zoom episode replayed all 2067 frames with zero API calls.
+No new live provider calls were made for v5.

@@ -15,6 +15,7 @@ from .rankers import ProviderError, Ranker, payload_for
 from .reporting import SCHEMA, Journal, new_run, provenance, report, write_json
 from .simulation import (
     ACTION_SET,
+    EVIDENCE_VERSION,
     BudgetStop,
     MarioSimulator,
     SimulationConfig,
@@ -282,6 +283,7 @@ def episode_run(args, capture=False):
                                         "id": f"{attempt}-{lane['decisions'] + 1}",
                                         "seed": sim.seed,
                                         "prefix": list(lane["prefix"]),
+                                        "decision_history": copy.deepcopy(sim.recent_decisions),
                                         "digest": before,
                                         "canonical": canonical,
                                         "tags": scenario_tags(canonical),
@@ -323,6 +325,7 @@ def episode_run(args, capture=False):
                                 lane["display"]["action"] = candidate
                             applied = []
                             execution_start = sim.digest()
+                            decision_start = sim.state()
                             execution_complete = False
                             airborne_case = []
 
@@ -379,6 +382,7 @@ def episode_run(args, capture=False):
                                     )
                             finally:
                                 lane["prefix"].extend(applied)
+                                sim.record_decision(candidate, decision_start, execution_complete)
                                 journal.emit(
                                     "execution",
                                     source="survival_guard"
@@ -404,6 +408,7 @@ def episode_run(args, capture=False):
                                             "id": f"{attempt}-{lane['decisions']}-airborne",
                                             "seed": sim.seed,
                                             "prefix": prefix,
+                                            "decision_history": copy.deepcopy(sim.recent_decisions),
                                             "digest": sim.digest(),
                                             "canonical": mid_canonical,
                                             "tags": scenario_tags(mid_canonical),
@@ -563,10 +568,39 @@ def replay(path):
         sim.close()
 
 
+def reconstruct_prefix(sim, case, config, budget):
+    """Recompute retained decision history from actual prefix controls, not claims."""
+    prefix = case["prefix"]
+    for decision in case.get("decision_history", []):
+        start = decision["before"]["game_frames"]
+        end = decision["after"]["game_frames"]
+        if not decision["complete"] or not sim.frames <= start < end <= len(prefix):
+            raise ValueError("Invalid corpus decision boundaries")
+        while sim.frames < start:
+            budget.step()
+            sim.step(prefix[sim.frames])
+        before = sim.state()
+        if before != decision["before"]:
+            raise ValueError("Corpus decision start does not reproduce")
+        actual = sim.execute(decision["candidate"], config, before_step=budget.step)
+        if sim.frames != end or actual["actions"] != prefix[start:end]:
+            raise ValueError("Corpus decision controls do not reproduce")
+        sim.record_decision(decision["candidate"], before, True)
+        if sim.recent_decisions[-1] != decision:
+            raise ValueError("Corpus decision outcome does not reproduce")
+    while sim.frames < len(prefix):
+        budget.step()
+        sim.step(prefix[sim.frames])
+
+
 def evaluate_corpus(args):
     source = args.corpus.read_bytes()
     corpus = json.loads(source)
     compatible(corpus)
+    if corpus.get("evidence_version") != EVIDENCE_VERSION:
+        raise ValueError(
+            "Corpus lacks current progress/cycle evidence; recapture it. Old episode logs still replay."
+        )
     if corpus.get("simulation", {}).get("continuation_set") not in (
         "all-seven-v1",
         "all-seven-airborne-v2",
@@ -629,14 +663,12 @@ def evaluate_corpus(args):
                 if len(case["prefix"]) > args.game_frames:
                     raise BudgetStop("checkpoint_replay_frame_cap")
                 sim = MarioSimulator(corpus["env"], case["seed"])
-                for action in case["prefix"]:
-                    budget.step()
-                    sim.step(action)
+                config = SimulationConfig(**corpus["simulation"])
+                reconstruct_prefix(sim, case, config, budget)
                 if sim.digest() != case["digest"]:
                     raise ValueError(
                         "Corpus checkpoint diverged; do not score stale or altered evidence"
                     )
-                config = SimulationConfig(**corpus["simulation"])
                 outcomes = sim.explore(config, budget)
                 canonical = canonical_state(sim, outcomes, config)
                 if canonical != case["canonical"]:

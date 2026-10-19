@@ -14,6 +14,7 @@ from typesafe_mario.actions import ACTION_TO_INDEX, Action
 from typesafe_mario.runner import create_mario_env
 
 ACTION_SET = "simple-macros-v1"
+EVIDENCE_VERSION = "progress-cycles-v1"
 CANDIDATES = ("run", "walk", "jump", "run_jump", "hop", "wait", "back")
 FOLLOW_UPS = CANDIDATES
 
@@ -80,6 +81,7 @@ class MarioSimulator:
         self.best_x = self.x
         self.last_gain_frame = 0
         self.recent_controls = []
+        self.recent_decisions = []
         self.chain = []
         wrapper = self.env
         while True:
@@ -141,12 +143,24 @@ class MarioSimulator:
             self.best_x,
             self.last_gain_frame,
             copy.deepcopy(self.recent_controls),
+            copy.deepcopy(self.recent_decisions),
         )
 
     def restore(self, checkpoint):
-        native, states, frame, info, term, trunc, frames, reward, best, last_gain, history = (
-            checkpoint
-        )
+        (
+            native,
+            states,
+            frame,
+            info,
+            term,
+            trunc,
+            frames,
+            reward,
+            best,
+            last_gain,
+            history,
+            decisions,
+        ) = checkpoint
         self.core.load_state(native)
         for wrapper, state in zip(self.chain, states, strict=True):
             for key, value in state.items():
@@ -162,6 +176,19 @@ class MarioSimulator:
         self.frames, self.reward, self.best_x = frames, reward, best
         self.last_gain_frame = last_gain
         self.recent_controls = copy.deepcopy(history)
+        self.recent_decisions = copy.deepcopy(decisions)
+
+    def record_decision(self, candidate, before, complete):
+        """Call only for actual execution, never for hypothetical explore branches."""
+        self.recent_decisions.append(
+            {
+                "candidate": candidate,
+                "before": copy.deepcopy(before),
+                "after": self.state(),
+                "complete": complete,
+            }
+        )
+        self.recent_decisions = self.recent_decisions[-12:]
 
     def digest(self):
         metadata = json.dumps(
@@ -339,12 +366,19 @@ def canonical_state(sim, outcomes, config):
         "state": sim.state(),
         "history": {
             "recent_controls": copy.deepcopy(sim.recent_controls),
+            "recent_decisions": copy.deepcopy(sim.recent_decisions),
+            "current_area_previous_visits": sum(
+                same_area(sim.state(), d["before"]) for d in sim.recent_decisions
+            ),
             "frames_since_best_x": sim.frames - sim.last_gain_frame,
-            "note": "Actual executed controls only; consecutive identical controls are grouped. No new best x includes deliberate retreat.",
+            "note": "Actual execution only. Recent decisions contain at most 12 applied macros (empty when unavailable, including realtime). Area matches use x/y within 4 pixels, grounded and power status; they are not identical emulator states. No new best x can include useful waiting or retreat.",
         },
         "outcomes": {
             name: {
                 "continuation_summary": continuation_summary(value),
+                "progress_summary": progress_summary(
+                    value, sim.state(), sim.recent_decisions, name
+                ),
                 **{
                     k: value[k]
                     for k in (
@@ -359,6 +393,39 @@ def canonical_state(sim, outcomes, config):
             }
             for name, value in outcomes.items()
         },
+    }
+
+
+def same_area(a, b):
+    return (
+        abs(a["x"] - b["x"]) <= 4
+        and abs(a["y"] - b["y"]) <= 4
+        and a["grounded"] == b["grounded"]
+        and a["status"] == b["status"]
+    )
+
+
+def progress_summary(outcome, state, decisions, candidate):
+    viable = [c for c in outcome["continuations"] if c["status"] in ("alive", "clear")]
+    best_follow_dx = max((c["dx"] for c in viable), default=None)
+    endpoint = None if best_follow_dx is None else outcome["x_after"] + best_follow_dx
+    previous = [
+        d
+        for d in decisions
+        if d["complete"] and d["candidate"] == candidate and same_area(state, d["before"])
+    ]
+    return {
+        "best_surviving_two_move_dx": None
+        if best_follow_dx is None
+        else outcome["dx"] + best_follow_dx,
+        "best_surviving_endpoint_x": endpoint,
+        "gain_beyond_best_x": None if endpoint is None else max(0, endpoint - state["best_x"]),
+        "best_surviving_followups": [c["id"] for c in viable if c["dx"] == best_follow_dx],
+        "surviving_forward_followups": [c["id"] for c in viable if c["dx"] > 0],
+        "prior_attempts_from_area": len(previous),
+        "prior_attempts_without_new_best": sum(
+            d["after"]["best_x"] <= d["before"]["best_x"] for d in previous
+        ),
     }
 
 
@@ -398,12 +465,20 @@ def continuation_summary(outcome):
 def selection_diagnostics(canonical, candidate):
     outcome = canonical["outcomes"][candidate]
     followups = continuation_summary(outcome)
+    progress = outcome.get("progress_summary", {})
     return {
         "immediate_death": outcome["status"] == "dead",
         "fatal_when_survivor_available": outcome["status"] == "dead"
         and any(v["status"] in ("alive", "clear") for v in canonical["outcomes"].values()),
         "all_tested_followups_fatal": followups["all_tested_fatal"],
         "unknown_outcome": outcome["status"] == "unknown",
+        "repeated_area_choice": progress.get("prior_attempts_without_new_best", 0) >= 2,
+        "missed_surviving_progress": progress.get("gain_beyond_best_x") == 0
+        and outcome["status"] != "clear"
+        and any(
+            (v.get("progress_summary", {}).get("gain_beyond_best_x") or 0) > 0
+            for v in canonical["outcomes"].values()
+        ),
         "incomplete_followup_coverage": outcome["status"] in ("alive", "unknown")
         and followups["coverage"] != "complete",
         "zero_progress": outcome["dx"] <= 0 and outcome["status"] != "clear",

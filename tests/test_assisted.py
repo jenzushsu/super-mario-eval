@@ -99,6 +99,11 @@ def test_corpus_evaluation_and_tamper_detection(tmp_path, monkeypatch):
     legacy_path.write_text(json.dumps(legacy))
     with pytest.raises(ValueError, match="recapture"):
         assisted.evaluate_corpus(options(tmp_path / "legacy-eval", corpus=legacy_path))
+    stale = dict(corpus)
+    stale.pop("evidence_version")
+    legacy_path.write_text(json.dumps(stale))
+    with pytest.raises(ValueError, match="progress/cycle evidence; recapture"):
+        assisted.evaluate_corpus(options(tmp_path / "legacy-eval", corpus=legacy_path))
     summary = json.loads((output / "summary.json").read_text())
     assert summary["shared_validation"]["simulation_frames"] > 0
     assert summary["shared_validation"]["wall_seconds"] > 0

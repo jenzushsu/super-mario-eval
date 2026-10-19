@@ -1,0 +1,649 @@
+{
+  "seed": 127,
+  "executions": [
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          16
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "bfa5b2c2f07877e493b908e9ba5d60692849821fca86c9507c75be3c540940d4"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          17
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "ca34bdaa3d826d244a54265770eed193fb557c4751587da8bca5f91de6a0b8c8"
+    },
+    {
+      "candidate": "jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_jump",
+          31
+        ],
+        [
+          "right",
+          42
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "1d916dedda9e1fc137359447e7784d52eb686faae186ece30563f8b7f2134a9a"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          16
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "336655c574e5629fc012aaf1579b227411accdb3fac3e4b40fa2bc426f3db43d"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          24
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "cb7f1418e6ec03bd25c4dbcd0d28f34c7006d374e9c4a8ca7655a574ee80f9fa"
+    },
+    {
+      "candidate": "walk",
+      "controls": [
+        [
+          "right",
+          48
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "a1f819444bf5bef17607ad3f6c40b06f015d63a511d69aebc1726898264b1e96"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          26
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "60ab8c10d8f4916911f734796628586bf6d7b6fc5c06d5601ed5b982eedd6e53"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          41
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "0de30ee264f9e1af3f301967bea4121b6119103f1d43efbead9109c2bb80f830"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          19
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "275d7a64fc6b35b094ef680eaec7124169fcdf320c7d127ca4ee0903eaf44ddf"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          19
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "bdaa67d30a15b70d4bb0fe6b20c1157fec14e16ad043a295441f031e829689ab"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          17
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "d3ce0f3e2d049b68fa5cfc8bbfbef21fe5633682ca22b32e435f35c2ba940b04"
+    },
+    {
+      "candidate": "jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_jump",
+          31
+        ],
+        [
+          "right",
+          16
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "5df663d4f40992daf1ae0f7f4be2e85a29214769128d094041ae40d19ea9939b"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          17
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "e9bf75eb1947eae96e152107ed9249a4c44b36553ed278cd6f379bfefb9c4f8f"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          23
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "62d41146c3b54a0d1d6e5bb1f0eb85b253c77005970ffcdb45b0f4ad9a651330"
+    },
+    {
+      "candidate": "back",
+      "controls": [
+        [
+          "left",
+          48
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "cdd1fb00e9f68e7576ea7a365629fead99384b509b51fbe3cff5c7078a9a9f86"
+    },
+    {
+      "candidate": "walk",
+      "controls": [
+        [
+          "right",
+          48
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "9d58e3eccf0beb92dff041d6b93e7da06d09a85dc356c1a1d00d8216eaa80ff4"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          16
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "5445bd4fd844fcff41d3712ad67e64ddeec5518ee7141eb5b683989bc1284ac7"
+    },
+    {
+      "candidate": "hop",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_jump",
+          7
+        ],
+        [
+          "right",
+          40
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "15f7b8cc6c01bb309378a7585d5854d0c9f75fefce2e8b7b5d6625793ed908ac"
+    },
+    {
+      "candidate": "jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_jump",
+          31
+        ],
+        [
+          "right",
+          16
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "8e2a1bd7946b77b3f3e14d6ebe4b9baf210233d6570c71a41010e2e561eed405"
+    },
+    {
+      "candidate": "hop",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_jump",
+          7
+        ],
+        [
+          "right",
+          40
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "23381efaed546097e5784f7a9d62abfc9a085265d5253417fb0372304e4e18a1"
+    },
+    {
+      "candidate": "hop",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_jump",
+          7
+        ],
+        [
+          "right",
+          40
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "c18f66cf3b06a60efda6696d96b278e90634de5216dc1dea8bb1454a0e10da11"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          31
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "5323923f4788eed7122698e529a451a188c589985adbd63f18f935299bbfa0aa"
+    },
+    {
+      "candidate": "jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_jump",
+          31
+        ],
+        [
+          "right",
+          31
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "54fe9fe696d46cf1cc26cb7625c70fdceb36a811112f6eb94e74548eb8e6d120"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          20
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "9cde7314f83c67b1f26ff2cab27abed3a77e0714699a4fc51cc0147ac9c3c93a"
+    },
+    {
+      "candidate": "jump",
+      "controls": [
+        [
+          "right_jump",
+          32
+        ],
+        [
+          "right",
+          16
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "a607a86eb01672cc1ead8db699434eba0a703b04df5af556170da8963f6f0ad5"
+    },
+    {
+      "candidate": "jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_jump",
+          31
+        ],
+        [
+          "right",
+          16
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "bcf1d4650345d527fd8c3989a1699ead82d1ef1e454e711610ccb5c578b0e166"
+    },
+    {
+      "candidate": "walk",
+      "controls": [
+        [
+          "right",
+          48
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "9de9c1abd4393445b0b19c0d2c583021b509590cae20acb81171321fbe90a2a4"
+    },
+    {
+      "candidate": "walk",
+      "controls": [
+        [
+          "right",
+          48
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "a9701cc2677ee05a01a42b51d8b2d788d9ba16bdafaf1b07d86bb08fb8a5477e"
+    },
+    {
+      "candidate": "back",
+      "controls": [
+        [
+          "left",
+          49
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "6616396c38083b109c3f8bb76f742f67b962bcc8b024744e6ffd25ef278af310"
+    },
+    {
+      "candidate": "run_jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_run_jump",
+          31
+        ],
+        [
+          "right_run",
+          17
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "e1120b19e7cd20cc4338ccb0341562df356fdb008bd44284700e59b4ed04af19"
+    },
+    {
+      "candidate": "jump",
+      "controls": [
+        [
+          "noop",
+          1
+        ],
+        [
+          "right_jump",
+          31
+        ],
+        [
+          "right",
+          16
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "05d6c4da26135bf079960b8ac486a7e0daea36b7007f754ef42bb875a0bced90"
+    },
+    {
+      "candidate": "walk",
+      "controls": [
+        [
+          "right",
+          48
+        ],
+        [
+          "noop",
+          4
+        ]
+      ],
+      "after_digest": "d4dc9c25120094d24ede66989e79c3ed4f6a41645c386703417f67323335d5ba"
+    }
+  ]
+}

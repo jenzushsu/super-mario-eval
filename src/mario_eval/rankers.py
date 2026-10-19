@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 
 from .simulation import rank_outcome
 
-PROMPT_VERSION = "outcome-ranker-v4"
+PROMPT_VERSION = "outcome-ranker-v5"
 OBJECTIVE = (
     "Choose the candidate that makes progress toward the flag without dying. "
     "Apply priorities in order: completion; survival with a viable next move; then progress. "
@@ -25,6 +25,11 @@ OBJECTIVE = (
     "Unknown outcomes are not evidence of death or safety. "
     "Use continuation_summary to distinguish complete, partial, and untested coverage. "
     "Prefer viable future moves over immediate distance alone; partial fatal follow-ups do not prove a trap. "
+    "Among surviving routes, compare progress_summary.best_surviving_two_move_dx and gain_beyond_best_x. "
+    "A smaller first move with forward surviving follow-ups can beat a larger move that leaves only waiting or retreat. "
+    "Null progress means untested or no observed surviving continuation, not zero progress or proven death. "
+    "Use recent_decisions and prior_attempts_without_new_best to avoid repeating an unproductive area/action cycle. "
+    "Area matches are approximate: enemies and timing can change; do not ban useful waits or retreats. "
     "Use history to recognize repeated no-progress actions, while allowing useful waits and retreats. "
     "Only your chosen move executes; follow-ups are hypothetical and must be selected on a later decision."
 )

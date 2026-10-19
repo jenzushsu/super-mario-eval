@@ -230,15 +230,26 @@ Simulation can take much longer than the resulting gameplay; its status is visib
 
 ### Shared history and continuation evidence
 
-Both providers receive the same `outcome-ranker-v4` instructions and fields:
+Both providers receive the same `outcome-ranker-v5` instructions and fields:
 
 - `history.recent_controls`: the last eight groups of actual controller buttons,
   with their frame counts and displacement. These are executed controls, not
   hypothetical rollouts or a record of the model's reasoning.
+- `history.recent_decisions`: the last 12 actually applied macros, including start/end
+  states and completion. Hypothetical branches never enter this history. This is
+  available for paused assisted runs; real-time runs leave it empty.
+- `history.current_area_previous_visits`: prior decisions within four pixels in x/y,
+  with matching grounded/power status. This is approximate position history, not
+  proof of an identical emulator state.
 - `history.frames_since_best_x`: actual frames without a new farthest position.
   Retreats and useful waiting can increase this counter too.
 - Each outcome's `continuation_summary`: tested/available counts, surviving move
   names, fatal/unknown counts, coverage, and earliest fatal follow-up frame.
+- Each outcome's `progress_summary`: best total displacement across the candidate
+  and a surviving follow-up, the corresponding follow-up names, endpoint x, gain
+  beyond the episode's best x, and previous same-move attempts in this area that
+  gained no new ground. Unknown/dead follow-ups do not count as surviving. Missing
+  surviving follow-ups produce null progress, not a claim of zero or inevitable death.
 
 Complete coverage means every available move was tested for one bounded follow-up,
 not that long-term safety is known. Depth zero and unexpanded outcomes are explicitly
@@ -251,6 +262,25 @@ contain the same per-candidate evidence as Jev criteria, binding each label to i
 measured outcome. These are prompt/evidence changes, not model fine-tuning.
 The [optional guard](#give-zoom-a-better-chance-of-surviving) adds execution assistance
 to every lane.
+
+### Avoid safe but unproductive cycles
+
+The shared v5 objective compares surviving two-move progress before immediate
+movement. In the uploaded stalled Zoom attempt, a `jump` advanced 48 pixels but
+left only waiting or retreating as surviving continuations. A `hop` advanced 16,
+then a surviving `jump` advanced another 63: **79 pixels over two moves**.
+The summary exposes this distinction without adding more lookahead depth.
+
+Recent decision history helps recognize retreat/reapproach loops and repeated
+walks with zero movement. It is a hint, not an action ban: waiting or retreating
+can be necessary, and similar positions can have different enemies and timing.
+The survival guard still intervenes only for predicted fatal choices. No automatic
+loop escape or progress override is added. Both providers receive the same fields
+and instructions; no level coordinates or winning action sequence are hard-coded.
+
+Run the same five-attempt command above after pulling this change. Inspect
+`repeated_area_choice`, `missed_surviving_progress`, and the chosen outcome's
+`progress_summary`. A full-stage improvement from v5 still needs live measurement.
 
 ### Read the report
 
@@ -282,10 +312,11 @@ input position, not progress achieved by a provider.
 
 ### Compare decisions on identical states
 
-**Recapture corpora made before `all-seven-v1`.** Evaluation rejects old corpora
-rather than silently change their evidence. Existing `all-seven-v1` corpora retain
-their original expansion rules; recapture to evaluate airborne follow-ups with v2.
-Old episode logs still support replay.
+**Recapture corpora without `evidence_version: progress-cycles-v1`.** The new
+evidence includes decision history and two-move progress. Evaluation reconstructs
+retained macro boundaries and outcomes from prefix controls, and rejects stale or
+altered history. Old episode logs still support replay; they do not silently acquire
+new model evidence. The simulation still supports the original v1 expansion rules.
 
 Capture a bounded search trajectory without keys, then evaluate the frozen
 checkpoints with both services and the deterministic baseline:
