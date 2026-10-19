@@ -10,3 +10,7 @@ Assisted mode adds shared finite-horizon outcome simulation, two live provider
 rankers, and a search-only baseline. Separate identical-state and episode reports
 explain progress, errors, and simulation assistance. Native checkpoint restoration
 and JSON action replay support reproducibility. Direct mode remains distinct.
+
+Both direct and assisted episode modes run independent parallel lanes. A slow
+provider cannot hold the other lane at a shared decision barrier. Each emulator
+pauses for its own inference; desktop rendering stays on the main thread.

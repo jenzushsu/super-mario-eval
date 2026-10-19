@@ -45,10 +45,13 @@ continuation above is for macOS/Linux shells).
 
 Every attempt uses matching level and seed across Jev, Zoom, and search. Episodes
 are independent, so states diverge after different choices. Lookahead supplies
-assistance: completion is not evidence of unaided gameplay. Execution pauses
-during simulation and API calls. Requests are scheduled sequentially across
-policies; API latency excludes simulation, and per-policy active wall time
-excludes time spent running the other policies. The three-attempt smoke benchmark
+assistance: completion is not evidence of unaided gameplay. Each lane independently simulates outcomes, requests a decision, and executes
+its move. Jev, Zoom, and the search baseline run concurrently; no lane waits for
+another lane’s response or move. Each emulator pauses only during its own
+simulation and API calls. API latency excludes simulation; per-lane wall time
+includes its own simulation, requests, execution, and CPU contention. Faster
+responses can produce faster wall-clock progress, without advancing game time
+while that lane is waiting. The three-attempt smoke benchmark
 is not a statistically conclusive performance study.
 
 ### Budgets and assistance
@@ -266,8 +269,9 @@ check those files before treating a run as successful.
 
 - Same level, seed (123), seven legal actions, parser, and eight emulator frames per action.
 - Two independent episodes; states diverge after the models choose different actions.
-- Requests run concurrently. Both emulators pause during inference, then advance in
-  lockstep. Latency is recorded but does not impose a gameplay penalty. This is a
+- Each lane requests decisions and executes moves independently in parallel. Its
+  emulator pauses during its own inference; the other lane can keep playing.
+  Latency affects wall-clock progress but does not consume in-game time. This is a
   decision-quality comparison, not the upstream real-time latency-sensitive mode.
 - Jev retains its native Choice, Noul and Score request. Zoom asks seven independent
   predicates, one per candidate action, and selects the highest probability.

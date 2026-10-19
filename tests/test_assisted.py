@@ -162,3 +162,34 @@ def test_rejects_old_or_incompatible_artifact(tmp_path):
     path.write_text('{"decision_index": 1}\n')
     with pytest.raises(ValueError, match="assisted episode"):
         assisted.replay(path)
+
+
+def test_assisted_fast_lane_executes_while_other_waits(tmp_path, monkeypatch):
+    from threading import Event
+
+    progressed = Event()
+    real_ranker = assisted.Ranker
+
+    class DelayedRanker(real_ranker):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.calls = 0
+
+        def choose(self, canonical, timeout=None, cancelled=lambda: False):
+            self.calls += 1
+            if self.provider == "fixture-jev":
+                assert progressed.wait(20), "Fast lane waited for slow ranking"
+            if self.provider == "fixture-zoom" and self.calls == 2:
+                progressed.set()
+            return super().choose(canonical, timeout, cancelled)
+
+    monkeypatch.setattr(assisted, "Ranker", DelayedRanker)
+    forbid_network(monkeypatch)
+    assert assisted.episode_run(options(tmp_path, max_decisions=2)) == 0
+    root = next(tmp_path.iterdir())
+    rows = json.loads((root / "summary.json").read_text())["runs"]
+    assert all(r["decisions"] == 2 and r["reason"] == "decision_cap" for r in rows)
+    # Concurrency must not contaminate the independent emulator states.
+    assert len({r["best_x"] for r in rows}) == 1
+    for policy in ("fixture-jev", "fixture-zoom", "search"):
+        assert assisted.replay(root / f"{policy}-001.jsonl") == 0

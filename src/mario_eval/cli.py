@@ -6,9 +6,9 @@ import os
 import statistics
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
+from threading import Event
 from uuid import uuid4
 
 from typesafe_mario.actions import ACTION_TO_INDEX, JUMP_RELEASE_ACTION, Action
@@ -16,6 +16,7 @@ from typesafe_mario.policy import HeuristicPolicy, TypeSafePolicy
 from typesafe_mario.runner import _unwrap_ram, create_mario_env
 from typesafe_mario.state import MarioStateParser
 
+from .concurrency import run_workers
 from .zoom import ZoomAPIError, ZoomPolicy
 
 
@@ -101,12 +102,12 @@ def run(args):
         "frames_per_decision": args.frames_per_decision,
         "max_decisions": args.max_decisions,
         "offline": args.offline,
-        "mode": "paired lockstep; emulator paused during inference",
+        "mode": "independent parallel lanes; each emulator pauses during its own inference",
         "upstream_commit": "ca22449ed187118d19326d1f54b01b6636578aa4",
     }
     (run_dir / "config.json").write_text(json.dumps(config, indent=2))
     lanes, view = [], None
-    cancelled = False
+    stopped = Event()
     try:
         for index, policy in enumerate(policies):
             env = create_mario_env(args.env, render_mode="rgb_array")
@@ -142,126 +143,108 @@ def run(args):
                 lane["method"] = "Heuristic smoke test · no model calls"
         if not args.headless:
             view = View(
-                f"{args.env} · Seed {args.seed} · {args.frames_per_decision} frames/action · Paused inference · Q to exit"
+                f"{args.env} · Seed {args.seed} · {args.frames_per_decision} frames/action · Independent parallel lanes · Q to exit"
             )
-        with ThreadPoolExecutor(max_workers=2) as pool:
+
+        def run_lane(lane):
             for _ in range(args.max_decisions):
-                pending = []
-                for lane in lanes:
-                    if lane["done"]:
-                        continue
-                    snapshot = lane["snapshot"]
-                    lane["status"] = "Choosing"
-                    pending.append(
-                        (
-                            lane,
-                            snapshot,
-                            pool.submit(lane["policy"].choose, snapshot, tuple(Action)),
-                        )
-                    )
-                if not pending:
+                if lane["done"] or stopped.is_set():
                     break
-                while not all(future.done() for _, _, future in pending):
-                    if view and not view.draw(lanes, "Choosing"):
-                        cancelled = True
-                        break
-                    time.sleep(0.016)
-                if cancelled:
-                    break
-                for lane, snapshot, future in pending:
-                    try:
-                        decision = future.result()
-                    except Exception as exc:  # noqa: BLE001 — isolate provider failures without hiding the failed run
-                        lane["status"] = "API error; see summary"
-                        lane["error"] = {
-                            "category": type(exc).__name__,
-                            "decision_index": lane["count"] + 1,
-                            "detail": str(exc)
-                            if isinstance(exc, ZoomAPIError)
-                            else "Provider call failed; check credentials, connectivity and response schema.",
-                        }
-                        lane["log"].write(
-                            json.dumps({"event": "provider_error", **lane["error"]}) + "\n"
-                        )
-                        lane["log"].flush()
-                        lane["done"] = True
-                        continue
-                    lane["action"] = decision.action.value
-                    lane["latency"] = decision.latency_ms
-                    lane["latencies"].append(decision.latency_ms)
-                    lane["last_reward"] = 0.0
-                    lane["decision"] = decision
-                    lane["executed_actions"] = []
-                    lane["status"] = "Running"
-                # Render each emulator frame; neither provider gains simulated time during inference.
-                for _frame in range(args.frames_per_decision):
-                    for lane, _, _ in pending:
-                        if lane["done"]:
-                            continue
-                        applied = controller_action(
-                            Action(lane["action"]), lane["snapshot"], _frame
-                        )
-                        frame, reward, terminated, truncated, info = lane["env"].step(
-                            ACTION_TO_INDEX[applied]
-                        )
-                        lane["executed_actions"].append(applied.value)
-                        lane["frames"] += 1
-                        lane["snapshot"] = lane["parser"].parse(
-                            info,
-                            _unwrap_ram(lane["env"]),
-                            previous_action=applied.value,
-                            previous_reward=float(reward),
-                            previous_latency_ms=lane["latency"],
-                            previous_response_delay_frames=0,
-                        )
-                        lane.update(frame=frame, info=info)
-                        lane["last_reward"] += float(reward)
-                        lane["reward"] += float(reward)
-                        lane["best_x"] = max(lane["best_x"], int(info.get("x_pos", 0)))
-                        lane["clear"] = bool(info.get("clear", False))
-                        lane["dead"] = bool(info.get("death", False))
-                        lane["done"] = terminated or truncated or lane["clear"] or lane["dead"]
-                        if lane["done"]:
-                            lane["status"] = (
-                                "Cleared"
-                                if lane["clear"]
-                                else "Died"
-                                if lane["dead"]
-                                else "Truncated"
-                                if truncated
-                                else "Episode ended"
-                            )
-                    if view:
-                        if not view.draw(lanes, "Running"):
-                            cancelled = True
-                            break
-                        time.sleep(1 / 60)
-                for lane, snapshot, _ in pending:
-                    if "error" in lane:
-                        continue
-                    lane["count"] += 1
-                    record = {
-                        "decision_index": lane["count"],
-                        "state": snapshot.to_state(),
-                        "state_after": lane["snapshot"].to_state(),
-                        "executed_actions": lane["executed_actions"],
-                        "emulator_frames": lane["frames"],
-                        "decision": asdict(lane["decision"]),
-                        "reward": lane["last_reward"],
-                        "total_reward": lane["reward"],
-                        "best_x": lane["best_x"],
-                        "clear": lane["clear"],
-                        "dead": lane["dead"],
-                        "done": lane["done"],
-                        "metadata": getattr(lane["policy"], "last_metadata", {}),
-                        "score_semantics": "independent predicates"
-                        if lane is lanes[1] and not args.offline
-                        else "choice",
+                snapshot = lane["snapshot"]
+                lane["status"] = "Choosing"
+                try:
+                    decision = lane["policy"].choose(snapshot, tuple(Action))
+                except Exception as exc:  # noqa: BLE001 — isolate provider failures without hiding the failed run
+                    lane["status"] = "API error; see summary"
+                    lane["error"] = {
+                        "category": type(exc).__name__,
+                        "decision_index": lane["count"] + 1,
+                        "detail": str(exc)
+                        if isinstance(exc, ZoomAPIError)
+                        else "Provider call failed; check credentials, connectivity and response schema.",
                     }
-                    lane["log"].write(json.dumps(record) + "\n")
+                    lane["log"].write(
+                        json.dumps({"event": "provider_error", **lane["error"]}) + "\n"
+                    )
                     lane["log"].flush()
-                if cancelled:
-                    break
+                    lane["done"] = True
+                    continue
+                lane["action"] = decision.action.value
+                lane["latency"] = decision.latency_ms
+                lane["latencies"].append(decision.latency_ms)
+                lane["last_reward"] = 0.0
+                lane["decision"] = decision
+                lane["executed_actions"] = []
+                lane["status"] = "Running"
+                for _frame in range(args.frames_per_decision):
+                    if lane["done"] or stopped.is_set():
+                        break
+                    applied = controller_action(Action(lane["action"]), lane["snapshot"], _frame)
+                    frame, reward, terminated, truncated, info = lane["env"].step(
+                        ACTION_TO_INDEX[applied]
+                    )
+                    lane["executed_actions"].append(applied.value)
+                    lane["frames"] += 1
+                    lane["snapshot"] = lane["parser"].parse(
+                        info,
+                        _unwrap_ram(lane["env"]),
+                        previous_action=applied.value,
+                        previous_reward=float(reward),
+                        previous_latency_ms=lane["latency"],
+                        previous_response_delay_frames=0,
+                    )
+                    lane.update(frame=frame, info=info)
+                    lane["last_reward"] += float(reward)
+                    lane["reward"] += float(reward)
+                    lane["best_x"] = max(lane["best_x"], int(info.get("x_pos", 0)))
+                    lane["clear"] = bool(info.get("clear", False))
+                    lane["dead"] = bool(info.get("death", False))
+                    lane["done"] = terminated or truncated or lane["clear"] or lane["dead"]
+                    if lane["done"]:
+                        lane["status"] = (
+                            "Cleared"
+                            if lane["clear"]
+                            else "Died"
+                            if lane["dead"]
+                            else "Truncated"
+                            if truncated
+                            else "Episode ended"
+                        )
+                    if view:
+                        stopped.wait(1 / 60)
+                lane["count"] += 1
+                record = {
+                    "decision_index": lane["count"],
+                    "state": snapshot.to_state(),
+                    "state_after": lane["snapshot"].to_state(),
+                    "executed_actions": lane["executed_actions"],
+                    "emulator_frames": lane["frames"],
+                    "decision": asdict(lane["decision"]),
+                    "reward": lane["last_reward"],
+                    "total_reward": lane["reward"],
+                    "best_x": lane["best_x"],
+                    "clear": lane["clear"],
+                    "dead": lane["dead"],
+                    "done": lane["done"],
+                    "metadata": getattr(lane["policy"], "last_metadata", {}),
+                    "score_semantics": "independent predicates"
+                    if lane is lanes[1] and not args.offline
+                    else "choice",
+                }
+                lane["log"].write(json.dumps(record) + "\n")
+                lane["log"].flush()
+            if not lane["done"]:
+                lane["status"] = "Stopped" if stopped.is_set() else "Decision limit reached"
+
+        def refresh():
+            if view and not view.draw([dict(lane) for lane in lanes], "Parallel"):
+                stopped.set()
+
+        try:
+            run_workers([lambda lane=lane: run_lane(lane) for lane in lanes], refresh, stopped.set)
+        except KeyboardInterrupt:
+            stopped.set()
+        cancelled = stopped.is_set()
         for lane in lanes:
             if not lane["done"]:
                 lane["status"] = "Stopped" if cancelled else "Decision limit reached"

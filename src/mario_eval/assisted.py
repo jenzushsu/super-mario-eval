@@ -4,10 +4,12 @@ import argparse
 import copy
 import hashlib
 import json
+import threading
 import time
 from dataclasses import asdict
 from pathlib import Path
 
+from .concurrency import run_workers
 from .rankers import ProviderError, Ranker, payload_for
 from .reporting import SCHEMA, Journal, new_run, provenance, report, write_json
 from .simulation import (
@@ -24,6 +26,8 @@ class Display:
     """Reuse the existing paired desktop view; the search baseline stays in the report."""
 
     def __init__(self, enabled, offline):
+        self.owner = threading.get_ident()
+        self.lock = threading.Lock()
         self.view = None
         self.rows = []
         self.cancelled = False
@@ -38,22 +42,23 @@ class Display:
             )
 
     def refresh(self, force=False):
+        if threading.get_ident() != self.owner:
+            return self.cancelled
         if self.view and self.rows and (force or time.monotonic() - self.last_draw > 0.05):
-            self.cancelled |= not self.view.draw(self.rows[:2], "Assisted")
+            with self.lock:
+                rows = [dict(row) for row in self.rows[:2]]
+            self.cancelled |= not self.view.draw(rows, "Assisted")
             self.last_draw = time.monotonic()
         return self.cancelled
 
     def update(self, lane, status):
-        if self.view:
-            self.context = f"Assisted · {lane['sim'].env_id} · Seed {lane['sim'].seed}"
-            actor = "Search baseline (report)" if lane["policy"] == "search" else lane["policy"]
-            self.view.subtitle = f"{self.context} · {actor}: {status} · Q to stop"
-        lane["display"].update(
-            frame=lane["sim"].frame,
-            status=status,
-            best_x=lane["sim"].best_x,
-            reward=lane["sim"].reward,
-        )
+        with self.lock:
+            lane["display"].update(
+                frame=lane["sim"].frame.copy(),
+                status=status,
+                best_x=lane["sim"].best_x,
+                reward=lane["sim"].reward,
+            )
         self.refresh()
 
     def finish(self, args):
@@ -106,7 +111,7 @@ def summary(lane, attempt):
         "game_frames": sim.frames,
         "decisions": lane["decisions"],
         "api_attempts": lane["api_attempts"],
-        "latencies_ms": lane["latencies"],
+        "latencies_ms": list(lane["latencies"]),
         "simulation_frames": lane["budget"].used,
         "wall_seconds": lane["wall_used"]
         + (time.monotonic() - lane["active_start"] if lane["active_start"] is not None else 0),
@@ -149,6 +154,7 @@ def episode_run(args, capture=False):
                     "timeout",
                 )
             },
+            "scheduling": "independent parallel lanes",
             "automatic_escape": False,
             "automatic_followup": False,
         },
@@ -218,11 +224,15 @@ def episode_run(args, capture=False):
                         provenance=provenance(),
                     )
                 display.rows = [lane["display"] for lane in lanes]
-                while any(lane["reason"] is None for lane in lanes):
-                    for lane in lanes:
-                        if lane["reason"] is not None:
-                            continue
-                        sim, journal = lane["sim"], lane["journal"]
+                display.context = f"Assisted parallel · {args.env} · Seed {args.seed + attempt - 1}"
+                if display.view:
+                    display.view.subtitle = f"{display.context} · Independent lanes · Q to stop"
+                for lane in lanes:
+                    lane["summary"] = summary(lane, attempt)
+
+                def run_lane(lane, attempt=attempt):
+                    sim, journal = lane["sim"], lane["journal"]
+                    while lane["reason"] is None:
                         lane["active_start"] = time.monotonic()
                         lane["deadline"] = (
                             lane["active_start"] + args.wall_seconds - lane["wall_used"]
@@ -382,12 +392,28 @@ def episode_run(args, capture=False):
                         lane["active_start"] = None
                         if lane["reason"]:
                             display.update(lane, lane["reason"].replace("_", " ").capitalize())
+                        lane["summary"] = summary(lane, attempt)
+
+                last_report = 0.0
+
+                def refresh(lanes=lanes):
+                    nonlocal last_report
+                    display.refresh()
+                    if time.monotonic() - last_report < 0.25:
+                        return
+                    last_report = time.monotonic()
                     report(
                         root,
-                        all_rows + [summary(lane, attempt) for lane in lanes],
+                        all_rows + [lane["summary"] for lane in lanes],
                         track,
                         args.offline or capture,
                     )
+
+                run_workers(
+                    [lambda lane=lane: run_lane(lane) for lane in lanes],
+                    refresh,
+                    lambda: setattr(display, "cancelled", True),
+                )
             except KeyboardInterrupt:
                 display.cancelled = True
             finally:

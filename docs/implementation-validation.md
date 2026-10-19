@@ -27,3 +27,13 @@ Offline fixtures use deterministic ranking and are not model results. No claim o
 model superiority, successful live gameplay, or level completion follows from these
 checks. Generated artifacts remain local under the ignored `artifacts/` directory.
 See the [README](../README.md) for reproducible local commands and secret setup.
+
+## Parallel episode scheduling
+
+Direct and assisted episode lanes now request decisions and execute independently.
+The expanded suite passes **49 tests**, including checks that one lane executes a
+move and submits its next decision while the other is still waiting, cancellation
+joins workers before cleanup, desktop rendering stays on the main thread, and
+concurrent assisted trajectories replay without state contamination. Both desktop
+modes passed offline SDL smoke runs; screenshots were inspected. No additional
+live provider calls were made for this scheduling change.

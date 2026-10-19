@@ -11,7 +11,7 @@ Window: 1120×760; outer inset 32; lane pitch 552. Body 17px, small 14px,
 titles 26px. Native desktop fixed layout; not a browser or mobile surface.
 Keyboard: Q/Escape closes. Finished episodes remain visible until closed.
 
-Assisted mode inherits this desktop layout. The subtitle identifies which policy
-is currently simulating, waiting, or executing; search runs appear in the report
+Assisted mode inherits this desktop layout. The subtitle identifies parallel execution; each panel
+independently shows whether its policy is simulating, waiting, or executing; search runs appear in the report
 while the two primary panels remain Jev and Zoom. Offline fixtures are explicitly
 named in both headers. No new visual system or browser surface is introduced.

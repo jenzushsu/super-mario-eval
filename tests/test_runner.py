@@ -74,3 +74,43 @@ def test_grounded_jump_releases_once_and_preserves_airborne_hold():
     assert cli.controller_action(Action.RIGHT_RUN_JUMP, grounded, 1) == Action.RIGHT_RUN_JUMP
     assert cli.controller_action(Action.RIGHT_RUN_JUMP, airborne, 0) == Action.RIGHT_RUN_JUMP
     assert cli.controller_action(Action.RIGHT, grounded, 0) == Action.RIGHT
+
+
+def test_direct_fast_lane_executes_before_slow_response(tmp_path, monkeypatch):
+    from threading import Event
+
+    progressed = Event()
+    base = cli.HeuristicPolicy
+
+    class Slow(base):
+        def choose(self, *args):
+            assert progressed.wait(10), "Fast lane waited for slow response"
+            return super().choose(*args)
+
+    class Fast(base):
+        calls = 0
+
+        def choose(self, *args):
+            self.calls += 1
+            if self.calls == 2:
+                progressed.set()  # Its first action has executed before the second request.
+            return super().choose(*args)
+
+    policies = iter([Slow(), Fast()])
+    monkeypatch.setattr(cli, "HeuristicPolicy", lambda: next(policies))
+    args = SimpleNamespace(
+        offline=True,
+        artifacts_dir=tmp_path,
+        env="SuperMarioBros-1-1-v0",
+        seed=123,
+        frames_per_decision=8,
+        max_decisions=2,
+        headless=True,
+        screenshot=None,
+        exit_when_done=True,
+    )
+    assert cli.run(args) == 0
+    root = next(tmp_path.iterdir())
+    rows = json.loads((root / "summary.json").read_text())
+    assert [r["emulator_frames"] for r in rows] == [16, 16]
+    assert all(r["error"] is None for r in rows)
