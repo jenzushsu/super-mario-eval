@@ -24,10 +24,10 @@ class SimulationConfig:
     landing_cap: int = 72
     settle: int = 4
     continuation_depth: int = 1
-    continuation_set: str = "all-seven-v1"
+    continuation_set: str = "all-seven-airborne-v2"
 
     def __post_init__(self):
-        if self.continuation_set != "all-seven-v1":
+        if self.continuation_set not in ("all-seven-v1", "all-seven-airborne-v2"):
             raise ValueError("Unsupported continuation set")
         if self.horizon < 40 or self.landing_cap < 0 or self.settle < 0:
             raise ValueError("horizon must be >=40; landing cap and settle must be nonnegative")
@@ -294,7 +294,12 @@ class MarioSimulator:
                 self.restore(root)
                 outcome = self.execute(candidate, config, before_step=budget.step)
                 outcome["continuations"] = []
-                if outcome["status"] == "alive" and config.continuation_depth:
+                expandable = outcome["status"] == "alive" or (
+                    outcome["status"] == "unknown"
+                    and not self.done
+                    and config.continuation_set == "all-seven-airborne-v2"
+                )
+                if expandable and config.continuation_depth:
                     endpoint = self.checkpoint()
                     for follow in FOLLOW_UPS:
                         self.restore(endpoint)
@@ -398,11 +403,53 @@ def selection_diagnostics(canonical, candidate):
         "fatal_when_survivor_available": outcome["status"] == "dead"
         and any(v["status"] in ("alive", "clear") for v in canonical["outcomes"].values()),
         "all_tested_followups_fatal": followups["all_tested_fatal"],
-        "incomplete_followup_coverage": outcome["status"] == "alive"
+        "unknown_outcome": outcome["status"] == "unknown",
+        "incomplete_followup_coverage": outcome["status"] in ("alive", "unknown")
         and followups["coverage"] != "complete",
         "zero_progress": outcome["dx"] <= 0 and outcome["status"] != "clear",
         "repeated_no_progress": outcome["dx"] <= 0
         and outcome["status"] != "clear"
         and canonical.get("history", {}).get("frames_since_best_x", 0)
         >= canonical["simulation"]["horizon"],
+    }
+
+
+def survival_selection(canonical, proposed, scores):
+    """Bounded survival assistance; never infer fatality from missing follow-ups.
+
+    Return the model choice unchanged unless it predicts death or a completely
+    tested fatal continuation set, and an evaluated alternative survives.
+    Model probabilities rank the eligible alternatives; this is not a search policy.
+    """
+    outcomes = canonical["outcomes"]
+    selected = outcomes[proposed]
+    followups = continuation_summary(selected)
+    reason = None
+    if selected["status"] == "dead":
+        reason = "predicted_death"
+    elif selected["status"] != "clear" and (
+        followups["coverage"] == "complete" and followups["all_tested_fatal"]
+    ):
+        reason = "all_seven_followups_fatal"
+
+    def viable(outcome):
+        if outcome["status"] == "clear":
+            return True
+        if outcome["status"] not in ("alive", "unknown"):
+            return False
+        summary = continuation_summary(outcome)
+        return bool(summary["surviving"]) or (
+            outcome["status"] == "alive" and summary["coverage"] == "not_tested"
+        )
+
+    eligible = [key for key, outcome in outcomes.items() if viable(outcome)]
+    applied = proposed
+    if reason and eligible:
+        applied = max(eligible, key=lambda key: (outcomes[key]["status"] == "clear", scores[key]))
+    return {
+        "proposed_candidate": proposed,
+        "applied_candidate": applied,
+        "overridden": applied != proposed,
+        "reason": reason if applied != proposed else "no_surviving_alternative" if reason else None,
+        "eligible_candidates": eligible,
     }

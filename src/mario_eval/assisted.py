@@ -21,6 +21,7 @@ from .simulation import (
     WorkBudget,
     canonical_state,
     selection_diagnostics,
+    survival_selection,
 )
 
 
@@ -123,10 +124,14 @@ def summary(lane, attempt):
         "error": lane.get("error"),
         "cost_usd": None,
         "diagnostics": dict(lane["diagnostics"]),
+        "survival_guard": lane.get("survival_guard", False),
     }
 
 
 def episode_run(args, capture=False):
+    survival_guard = getattr(args, "survival_guard", False)
+    if survival_guard and capture:
+        raise ValueError("--survival-guard is supported only for assisted episodes")
     config = SimulationConfig(args.horizon, args.landing_cap, args.settle, args.depth)
     policies = (
         ["search"]
@@ -166,6 +171,7 @@ def episode_run(args, capture=False):
             "scheduling": "independent parallel lanes",
             "automatic_escape": False,
             "automatic_followup": False,
+            "survival_guard": survival_guard,
         },
     )
     print(f"Artifacts: {root.resolve()}", flush=True)
@@ -181,6 +187,7 @@ def episode_run(args, capture=False):
                     journal = Journal(root / f"{policy}-{attempt:03d}.jsonl")
                     lane = {
                         "policy": policy,
+                        "survival_guard": survival_guard,
                         "ranker": rankers[policy],
                         "sim": sim,
                         "journal": journal,
@@ -204,7 +211,9 @@ def episode_run(args, capture=False):
                                 "fixture-zoom": "Zoom [OFFLINE FIXTURE]",
                                 "search": "Search baseline",
                             }[policy],
-                            "method": "Assisted · "
+                            "method": (
+                                "Assisted + survival guard · " if survival_guard else "Assisted · "
+                            )
                             + (
                                 "native Choice"
                                 if policy == "jev"
@@ -295,6 +304,23 @@ def episode_run(args, capture=False):
                                 diagnostics=diagnostics,
                                 **asdict(ranking),
                             )
+                            # Preserve the provider ranking verbatim. Only execution changes.
+                            candidate = ranking.candidate
+                            intervention = None
+                            if survival_guard:
+                                intervention = survival_selection(
+                                    canonical, candidate, ranking.scores
+                                )
+                                candidate = intervention["applied_candidate"]
+                                lane["diagnostics"]["survival_guard_overrides"] += int(
+                                    intervention["overridden"]
+                                )
+                                journal.emit(
+                                    "survival_guard",
+                                    decision_index=lane["decisions"],
+                                    **intervention,
+                                )
+                                lane["display"]["action"] = candidate
                             applied = []
                             execution_start = sim.digest()
                             execution_complete = False
@@ -341,16 +367,13 @@ def episode_run(args, capture=False):
 
                             try:
                                 result = sim.execute(
-                                    ranking.candidate,
+                                    candidate,
                                     config,
                                     before_step=guard,
                                     on_frame=on_frame,
                                 )
                                 execution_complete = True
-                                if (
-                                    result["digest_after"]
-                                    != outcomes[ranking.candidate]["digest_after"]
-                                ):
+                                if result["digest_after"] != outcomes[candidate]["digest_after"]:
                                     raise RuntimeError(
                                         "Actual execution diverged from its simulated candidate"
                                     )
@@ -358,8 +381,10 @@ def episode_run(args, capture=False):
                                 lane["prefix"].extend(applied)
                                 journal.emit(
                                     "execution",
-                                    source="policy",
-                                    candidate=ranking.candidate,
+                                    source="survival_guard"
+                                    if intervention and intervention["overridden"]
+                                    else "policy",
+                                    candidate=candidate,
                                     decision_index=lane["decisions"],
                                     before_digest=execution_start,
                                     after_digest=sim.digest(),
@@ -542,7 +567,10 @@ def evaluate_corpus(args):
     source = args.corpus.read_bytes()
     corpus = json.loads(source)
     compatible(corpus)
-    if corpus.get("simulation", {}).get("continuation_set") != "all-seven-v1":
+    if corpus.get("simulation", {}).get("continuation_set") not in (
+        "all-seven-v1",
+        "all-seven-airborne-v2",
+    ):
         raise ValueError(
             "Corpus predates all-seven continuation/history evidence; recapture it. Old episode logs can still be replayed."
         )
@@ -798,6 +826,11 @@ def main(argv):
     parser.add_argument("--depth", type=int, choices=(0, 1), default=1)
     parser.add_argument("--model", default="jev-latest")
     parser.add_argument(
+        "--survival-guard",
+        action="store_true",
+        help="Assisted episodes only: log and replace predicted fatal choices when a surviving alternative exists",
+    )
+    parser.add_argument(
         "--zoom-question",
         choices=("choice", "predicate"),
         default="choice",
@@ -805,6 +838,10 @@ def main(argv):
     )
     parser.add_argument("--artifacts-dir", type=Path, default=Path("artifacts"))
     args = parser.parse_args(argv)
+    if args.survival_guard and args.command != "assisted":
+        parser.error(
+            "--survival-guard requires assisted; it cannot protect stale real-time predictions"
+        )
     if args.screenshot and (args.headless or args.command not in ("assisted", "realtime")):
         parser.error(
             "--screenshot needs an assisted or realtime desktop display (SDL dummy display is supported)"

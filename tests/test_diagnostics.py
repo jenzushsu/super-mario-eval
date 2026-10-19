@@ -31,3 +31,6 @@ def test_untested_and_no_progress_are_explicit():
     assert not result["immediate_death"]
     state["history"]["frames_since_best_x"] = 0
     assert not selection_diagnostics(state, "run")["repeated_no_progress"]
+    outcome["status"] = "unknown"
+    assert selection_diagnostics(state, "run")["unknown_outcome"]
+    assert selection_diagnostics(state, "run")["incomplete_followup_coverage"]

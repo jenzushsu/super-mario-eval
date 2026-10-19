@@ -113,6 +113,7 @@ def report(path, rows, track, offline, shared_validation=None):
             "schema": SCHEMA,
             "track": track,
             "offline": offline,
+            "survival_guard": any(row.get("survival_guard", False) for row in rows),
             "aggregate": aggregate,
             "shared_validation": shared_validation,
             "runs": rows,
@@ -168,10 +169,10 @@ def report(path, rows, track, offline, shared_validation=None):
         "",
         "## Decision diagnostics",
         "",
-        "Counts describe selected simulated moves, not observed future deaths or model accuracy.",
+        "Counts describe original model/policy selections, before any survival guard; not observed future deaths or model accuracy.",
         "",
-        "| Policy | Immediate death | All tested follow-ups fatal | Incomplete follow-ups | Non-forward | Repeated no progress |",
-        "|---|---:|---:|---:|---:|---:|",
+        "| Policy | Immediate death | All tested follow-ups fatal | Unknown outcome | Incomplete follow-ups | Non-forward | Repeated no progress | Guard overrides |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for item in aggregate:
         d = item["diagnostics"]
@@ -180,9 +181,11 @@ def report(path, rows, track, offline, shared_validation=None):
             for key in (
                 "immediate_death",
                 "all_tested_followups_fatal",
+                "unknown_outcome",
                 "incomplete_followup_coverage",
                 "zero_progress",
                 "repeated_no_progress",
+                "survival_guard_overrides",
             )
         ]
         lines.append(f"| {item['policy']} | " + " | ".join(map(str, values)) + " |")
@@ -191,6 +194,11 @@ def report(path, rows, track, offline, shared_validation=None):
         "Repeated no progress means selecting nonpositive displacement after at least one horizon without a new best x. Retreats can trigger it; it is not an automatic override.",
         "Complete follow-up coverage tests all seven moves for one horizon only; it does not prove eventual safety. Depth zero is explicitly untested.",
     ]
+    if any(row.get("survival_guard", False) for row in rows):
+        lines += [
+            "",
+            "**Survival guard enabled for every lane.** These results measure providers plus a shared guard, not raw provider choices. Original rankings and each guard decision are logged separately; execution records identify replacements. The guard does not guarantee a clear or prevent stalls.",
+        ]
     lines += [
         "",
         "## Interpretation",
@@ -198,7 +206,7 @@ def report(path, rows, track, offline, shared_validation=None):
         "- API latency excludes simulation; wall time includes waiting and simulation. Each lane pauses its own game time during both; episode lanes run independently in parallel.",
         "- The request and score semantics are recorded in each ranking event. Choice scores are not calibrated across providers; legacy predicate scores are independent and unnormalized.",
         "- Search and offline fixtures make no API calls. Reported usage is recorded per successful request; monetary cost is unknown.",
-        "- No automatic escape or follow-up actions are executed. All assistance is the shared simulated outcome set.",
+        "- Follow-ups are hypothetical and never automatically executed. With the optional survival guard, a predicted fatal choice can be replaced using the same simulated evidence.",
         "- Small samples are diagnostic, not evidence of statistical superiority. Model responses need not be deterministic.",
         "- Each JSONL contains the initial fingerprint, canonical evidence, sanitized request body, chosen move, actual controls, and final state.",
         "- Unavailable model identifiers or usage are unknown. Errors are not scored as gameplay deaths.",

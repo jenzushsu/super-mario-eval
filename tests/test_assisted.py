@@ -88,7 +88,7 @@ def test_corpus_evaluation_and_tamper_detection(tmp_path, monkeypatch):
         config["corpus_sha256"] == hashlib.sha256((output / "corpus.json").read_bytes()).hexdigest()
     )
     assert config["limits"]["max_decisions"] == 1
-    assert config["simulation"]["continuation_set"] == "all-seven-v1"
+    assert config["simulation"]["continuation_set"] == "all-seven-airborne-v2"
     assert "history" in events[0]["canonical"]
     assert all("diagnostics" in event for event in events)
     legacy = dict(corpus)
@@ -206,3 +206,50 @@ def test_assisted_fast_lane_executes_while_other_waits(tmp_path, monkeypatch):
     assert len({r["best_x"] for r in rows}) == 1
     for policy in ("fixture-jev", "fixture-zoom", "search"):
         assert assisted.replay(root / f"{policy}-001.jsonl") == 0
+
+
+def test_guard_preserves_model_ranking_and_logs_replacement(tmp_path, monkeypatch):
+    from mario_eval.rankers import Ranking
+
+    real_ranker = assisted.Ranker
+
+    class RiskyRanker(real_ranker):
+        def choose(self, canonical, timeout=None, cancelled=lambda: False):
+            dead = next(
+                (k for k, v in canonical["outcomes"].items() if v["status"] == "dead"), None
+            )
+            if dead is None:
+                return super().choose(canonical, timeout, cancelled)
+            scores = {k: 0.01 for k in canonical["outcomes"]}
+            scores[dead] = 0.94
+            return Ranking(dead, scores, "test_fixture")
+
+    monkeypatch.setattr(assisted, "Ranker", RiskyRanker)
+    forbid_network(monkeypatch)
+    assert assisted.episode_run(options(tmp_path, max_decisions=5, survival_guard=True)) == 0
+    root = next(tmp_path.iterdir())
+    records = [
+        json.loads(line) for line in (root / "fixture-zoom-001.jsonl").read_text().splitlines()
+    ]
+    overrides = [r for r in records if r["event"] == "survival_guard" and r["overridden"]]
+    assert overrides
+    for override in overrides:
+        events = {
+            r["event"]: r for r in records if r.get("decision_index") == override["decision_index"]
+        }
+        assert events["ranking"]["candidate"] == override["proposed_candidate"]
+        assert events["execution"]["candidate"] == override["applied_candidate"]
+        assert events["execution"]["source"] == "survival_guard"
+    summary = json.loads((root / "summary.json").read_text())
+    assert summary["survival_guard"]
+    zoom = next(r for r in summary["runs"] if r["policy"] == "fixture-zoom")
+    assert zoom["diagnostics"]["survival_guard_overrides"] == len(overrides)
+    assert "Survival guard enabled for every lane" in (root / "report.md").read_text()
+    assert assisted.replay(root / "fixture-zoom-001.jsonl") == 0
+
+
+@pytest.mark.parametrize("command", ["realtime", "capture", "evaluate", "replay"])
+def test_survival_guard_rejects_unsupported_tracks(command):
+    with pytest.raises(SystemExit) as error:
+        assisted.main([command, "--survival-guard"])
+    assert error.value.code == 2

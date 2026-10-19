@@ -83,6 +83,39 @@ For a no-key desktop check:
 uv run --frozen mario-eval realtime --offline --episodes 1 --max-decisions 2 --depth 0
 ```
 
+### Give Zoom a better chance of surviving
+
+Use **paused assisted mode, native choice, depth 1, and the optional survival guard**:
+
+```sh
+uv run --frozen --env-file .env mario-eval assisted --zoom-question choice --depth 1 --survival-guard --episodes 5 --max-decisions 100 --wall-seconds 600 --simulation-frames 400000 --headless
+```
+
+Remove `--headless` for the side-by-side window. Let all five attempts finish;
+Q/Escape cancels the remaining attempts. If using the pip/venv setup below,
+activate the environment, export the two API keys, and replace
+`uv run --frozen --env-file .env mario-eval` with `mario-eval`.
+
+The guard applies the **same rule to Jev, Zoom, and search**. It replaces a choice
+only when it predicts death, or all seven tested follow-ups predict death, and
+an evaluated surviving alternative exists. Among eligible alternatives it prefers
+a completion, then the provider's highest score. It does not infer fatality from
+unknown or partial evidence, retry API failures, or execute follow-ups automatically.
+Waiting and retreating remain valid choices. It does not prevent all stalls or
+guarantee completion.
+
+`ranking` events retain the original provider choice and probabilities.
+`survival_guard` events record the proposed/applied moves, eligible alternatives,
+and reason; `execution.source` identifies replacements. The display, config,
+summary, and report label guarded runs. These results measure **provider plus guard**;
+omit `--survival-guard` for raw model comparisons and keep the result sets separate.
+The flag is supported only by `assisted`, because real-time predictions are stale.
+
+The regression suite reproduces four failure states from the uploaded runs and
+checks that replacements and a subsequent continuation survive. This is local
+survival evidence, not a measured improvement in the live service's win rate.
+See [the nine-run analysis](docs/zoom-survival-review.md).
+
 ### Available Zoom request types
 
 | API type | Response meaning | Use in this project |
@@ -103,7 +136,8 @@ The new `assisted` mode follows the experiment design of
 [4esv/jev-mario](https://github.com/4esv/jev-mario): simulate possible moves, then
 ask the services to rank measured outcomes. The implementation is original and
 uses our existing Python 3.13 emulator stack. It includes a deterministic
-search-only baseline, no automatic escape moves, and no unselected follow-ups.
+search-only baseline and no automatically executed follow-ups. An optional shared
+survival guard can replace predicted fatal selections; it is off by default.
 The original commands below still run **direct control**, a separate benchmark.
 
 After [local setup and `.env` configuration](#run-locally), run the live assisted
@@ -179,9 +213,11 @@ and mixed-question contracts. Native choice gameplay improvement is not yet veri
 
 Seven versioned macros use a 48-frame horizon, up to 72 extra landing frames,
 and four neutral settling frames. `--depth 1` (default) evaluates all seven single-move
-continuations per surviving candidate, including walk, hop, wait, and back.
-This is recorded as `continuation_set: all-seven-v1` and costs more simulation
-work than the older three-continuation experiment. Only the selected candidate is executed;
+continuations per surviving **or nonterminal airborne/unknown** candidate, including
+walk, hop, wait, and back. This is recorded as
+`continuation_set: all-seven-airborne-v2`. It closes the previous blind spot where
+an airborne endpoint had no tested next moves, at additional simulation cost.
+Truncated or terminated emulators are never expanded. Only the selected candidate is executed;
 continuations provide evidence, not automatic actions. `--depth 0` is faster but
 changes the experiment. Airborne or truncated outcomes are recorded as unknown,
 not silently classified as fatal or safe.
@@ -194,7 +230,7 @@ Simulation can take much longer than the resulting gameplay; its status is visib
 
 ### Shared history and continuation evidence
 
-Both providers receive the same `outcome-ranker-v3` instructions and fields:
+Both providers receive the same `outcome-ranker-v4` instructions and fields:
 
 - `history.recent_controls`: the last eight groups of actual controller buttons,
   with their frame counts and displacement. These are executed controls, not
@@ -209,9 +245,12 @@ not that long-term safety is known. Depth zero and unexpanded outcomes are expli
 untested. The history is reconstructed from recorded controls and restored after
 lookahead, so hypothetical actions never pollute the next request.
 
-No safety filter, forced escape, or automatic follow-up overrides either provider.
-Instructions encourage survival over immediate distance, while recognizing stalls
-and the limitations of partial evidence. Both providers receive the same changes.
+By default, neither provider is overridden. Instructions prioritize survival before
+distance and explicitly allow waiting or retreating. Zoom choice descriptions now
+contain the same per-candidate evidence as Jev criteria, binding each label to its
+measured outcome. These are prompt/evidence changes, not model fine-tuning.
+The [optional guard](#give-zoom-a-better-chance-of-surviving) adds execution assistance
+to every lane.
 
 ### Read the report
 
@@ -232,17 +271,21 @@ Legacy predicate scores must not be treated as a categorical distribution.
 Offline fixtures are never included as live model measurements.
 
 The **Decision diagnostics** table and each ranking event distinguish immediate
-predicted death, all tested follow-ups fatal, incomplete follow-up coverage,
+predicted death, all tested follow-ups fatal, unknown outcomes, incomplete follow-up coverage,
 non-forward selections, and repeated no progress. The last metric counts selecting
 nonpositive displacement after at least one horizon without a new best position;
-it can flag deliberate retreats. These are diagnostics, not model accuracy or
+it can flag deliberate retreats. Unknown outcomes count as incomplete when their
+follow-ups are untested. Guard overrides are counted separately; selection diagnostics
+always describe the original provider choice. These are diagnostics, not model accuracy or
 proof that an episode must fail. In identical-state reports, checkpoint x is the
 input position, not progress achieved by a provider.
 
 ### Compare decisions on identical states
 
 **Recapture corpora made before `all-seven-v1`.** Evaluation rejects old corpora
-rather than silently change their evidence. Old episode logs still support replay.
+rather than silently change their evidence. Existing `all-seven-v1` corpora retain
+their original expansion rules; recapture to evaluate airborne follow-ups with v2.
+Old episode logs still support replay.
 
 Capture a bounded search trajectory without keys, then evaluate the frozen
 checkpoints with both services and the deterministic baseline:

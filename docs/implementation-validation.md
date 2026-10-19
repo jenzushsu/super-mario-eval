@@ -80,3 +80,18 @@ old corpora require recapture because canonical evidence changed.
 - `--depth 0` is documented for lower planning latency. Full continuation search
   remains available via `--depth 1`. Real-time results must remain separate from
   paused assisted comparisons because latency changes the game state.
+
+## Airborne lookahead and optional survival guard
+
+- **87 tests passed**. Four additional archived Zoom failure states reproduce
+  exact fingerprints; guarded replacements and one subsequent continuation survive.
+- The suite covers preserving original model choices, separate guard/execution
+  logging, report counts, replay after replacement, budget rollback during airborne
+  expansion, terminal unknown states, partial evidence, and legacy v1 expansion.
+- All nine uploaded Zoom trajectories replayed successfully without API calls.
+- Lint, formatting, and whitespace checks passed.
+- One live v4 Zoom request returned **HTTP 403**. Local regression survival is
+  verified; new live-provider win rates and prompt effects remain unmeasured.
+- The guard is off by default, applies equally to all paused assisted lanes,
+  and is rejected for other tracks. Guarded results must remain separate from
+  raw provider comparisons. See [the detailed analysis](zoom-survival-review.md).

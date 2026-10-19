@@ -14,10 +14,13 @@ from dataclasses import dataclass, field
 
 from .simulation import rank_outcome
 
-PROMPT_VERSION = "outcome-ranker-v3"
+PROMPT_VERSION = "outcome-ranker-v4"
 OBJECTIVE = (
     "Choose the candidate that makes progress toward the flag without dying. "
-    "Prefer a completion, then surviving moves with viable continuations. "
+    "Apply priorities in order: completion; survival with a viable next move; then progress. "
+    "Never choose a move marked dead when a surviving alternative exists, even if it travels farther. "
+    "Avoid a move whose complete seven-follow-up set is all fatal when a viable alternative exists. "
+    "Wait or back can be the best move: momentum can carry Mario into danger even while walking. "
     "These are finite-horizon observations, not guarantees of future success. "
     "Unknown outcomes are not evidence of death or safety. "
     "Use continuation_summary to distinguish complete, partial, and untested coverage. "
@@ -75,7 +78,10 @@ def payload_for(provider, canonical, model="jev-latest", zoom_question="choice")
                         "name": "action",
                         "type": "choice",
                         "instructions": OBJECTIVE,
-                        "choices": [{"value": key} for key in canonical["outcomes"]],
+                        "choices": [
+                            {"value": key, "description": json.dumps(value, sort_keys=True)}
+                            for key, value in canonical["outcomes"].items()
+                        ],
                     }
                 ],
             }

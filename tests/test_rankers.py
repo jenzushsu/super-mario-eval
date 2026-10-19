@@ -209,8 +209,14 @@ def test_native_choice_envelope_and_roundtrip(canonical, monkeypatch):
             "name": "action",
             "type": "choice",
             "instructions": payload_for("jev", canonical)["questions"]["action"]["instructions"],
-            "choices": [{"value": key} for key in canonical["outcomes"]],
+            "choices": [
+                {"value": key, "description": json.dumps(value, sort_keys=True)}
+                for key, value in canonical["outcomes"].items()
+            ],
         }
+        assert {c["value"]: c["description"] for c in question["choices"]} == payload_for(
+            "jev", canonical
+        )["questions"]["action"]["criteria"]
         return expected
 
     monkeypatch.setattr("mario_eval.rankers.bounded_post", respond)

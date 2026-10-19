@@ -18,14 +18,18 @@ plain text strings. The image example uses a user message/content array containi
     "name": "action",
     "type": "choice",
     "instructions": "<shared objective also sent to Jev>",
-    "choices": [{"value": "run"}, {"value": "jump"}]
+    "choices": [
+      {"value": "run", "description": "<serialized run outcome and continuations>"},
+      {"value": "jump", "description": "<serialized jump outcome and continuations>"}
+    ]
   }]
 }
 ```
 
-The actual runner lists all seven candidates. Optional choice descriptions are
-supported by the supplied mixed example, but not needed here: measured outcomes
-are already in the shared input.
+The actual runner lists all seven candidates. Choice descriptions bind each label
+to its measured outcome and continuations, using exactly the same JSON as Jev
+criteria. The shared canonical input remains identical. Description support comes
+from the supplied mixed-question example.
 
 The response contains `answers: [{"name": "action", "type": "choice",
 "choice": "jump", "probabilities": [{"value": "run", "probability": 0.1},
@@ -45,7 +49,7 @@ uv run --frozen --env-file .env mario-eval assisted --zoom-question choice --epi
 predicate experiment, pass `--zoom-question predicate`. The selected type is
 saved in config.json and the exact request and score semantics are logged.
 Both modes preserve the same canonical evidence, candidates, and objective.
-The request version is `outcome-ranker-v3`; old logs retain their original version.
+The request version is `outcome-ranker-v4`; old logs retain their original version.
 Direct control (`mario-eval` without a subcommand) retains its predicate adapter.
 
 ## Predicate
