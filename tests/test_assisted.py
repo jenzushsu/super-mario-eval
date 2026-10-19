@@ -88,6 +88,9 @@ def test_corpus_evaluation_and_tamper_detection(tmp_path, monkeypatch):
         config["corpus_sha256"] == hashlib.sha256((output / "corpus.json").read_bytes()).hexdigest()
     )
     assert config["limits"]["max_decisions"] == 1
+    assert config["comparison_parameters"]["question_formats_match"]
+    assert config["comparison_parameters"]["identical_state_evaluation"]
+    assert not config["comparison_parameters"]["service_decoding_equivalence_verified"]
     assert config["simulation"]["continuation_set"] == "all-seven-airborne-v2"
     assert "history" in events[0]["canonical"]
     assert all("diagnostics" in event for event in events)

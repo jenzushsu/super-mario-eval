@@ -209,6 +209,39 @@ command. The setting is recorded in config.json. Direct control still uses predi
 See [Zoom formats](docs/zoom-api.md) for the supplied choice, predicate, score,
 and mixed-question contracts. Native choice gameplay improvement is not yet verified.
 
+### Matching provider parameters
+
+Native choice (`--zoom-question choice`, the default) uses one shared objective,
+canonical evidence, ordered action set, and per-action descriptions for both
+services. Each episode gets the same level/seed, simulation configuration, stop
+limits, timeout cap, and survival-guard rule. Independent gameplay states diverge
+after different moves; use `capture` + `evaluate` below to compare identical states.
+Real-time mode also permits different decision ages because service latency differs.
+
+`config.json.comparison_parameters` explicitly records what is and is not matched:
+
+| Control | Jev | Zoom |
+| --- | --- | --- |
+| Default question | Native choice | Native choice |
+| Objective and action descriptions | Shared | Shared |
+| Model selection | `--model` (default `jev-latest`) | Service-selected; no model selector in the supplied contract |
+| Temperature, top-p, inference seed, output limit | Not sent; effective defaults unknown | Not sent; effective defaults unknown |
+
+**Equal internal model settings cannot be verified from these API contracts.**
+The emulator's `--seed` is not an inference seed. We do not invent unsupported
+Zoom parameters or claim omitted defaults are identical. The model identifier
+returned by each service is recorded in ranking metadata. `--model` applies only
+to Jev. Legacy Zoom predicates are explicitly marked as nonmatching question
+formats in the configuration; use native choice for a matched task.
+
+Successful live ranking events include `request_contract_sha256`. For the same
+checkpoint, matching hashes confirm equal submitted state, question, instructions,
+ordered choices/descriptions, and other explicit request parameters after normalizing
+the provider envelopes. Model identity is deliberately excluded. This does not
+verify hidden defaults, tokenization, or model weights. Fingerprints can differ
+across independent episodes because the inputs differ. These audit fields do not
+change the v5 prompt or gameplay policy.
+
 ### Budgets and assistance
 
 Seven versioned macros use a 48-frame horizon, up to 72 extra landing frames,

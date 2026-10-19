@@ -12,7 +12,7 @@ from pathlib import Path
 from threading import Lock
 from uuid import uuid4
 
-from .rankers import PROMPT_VERSION
+from .rankers import PROMPT_VERSION, comparison_parameters
 from .simulation import ACTION_SET, EVIDENCE_VERSION
 
 SCHEMA = "mario-eval-assisted-v1"
@@ -53,7 +53,12 @@ def provenance():
 def new_run(root, config):
     path = Path(root) / (datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid4().hex[:8])
     path.mkdir(parents=True)
-    write_json(path / "config.json", provenance() | config | {"run_id": path.name})
+    write_json(
+        path / "config.json",
+        provenance()
+        | config
+        | {"run_id": path.name, "comparison_parameters": comparison_parameters(config)},
+    )
     return path
 
 

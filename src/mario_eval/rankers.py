@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -56,9 +57,15 @@ class Ranking:
     latency_ms: float = 0
     metadata: dict = field(default_factory=dict)
     request: dict | None = None
+    request_contract_sha256: str | None = None
 
 
 def payload_for(provider, canonical, model="jev-latest", zoom_question="choice"):
+    # Construct candidate evidence once so native-choice adapters cannot drift.
+    descriptions = {
+        key: json.dumps(value, sort_keys=True, allow_nan=False)
+        for key, value in canonical["outcomes"].items()
+    }
     if provider == "jev":
         return {
             "model": model,
@@ -67,10 +74,7 @@ def payload_for(provider, canonical, model="jev-latest", zoom_question="choice")
                 "action": {
                     "type": "choice",
                     "instructions": OBJECTIVE,
-                    "criteria": {
-                        key: json.dumps(value, sort_keys=True)
-                        for key, value in canonical["outcomes"].items()
-                    },
+                    "criteria": descriptions,
                 }
             },
         }
@@ -84,8 +88,8 @@ def payload_for(provider, canonical, model="jev-latest", zoom_question="choice")
                         "type": "choice",
                         "instructions": OBJECTIVE,
                         "choices": [
-                            {"value": key, "description": json.dumps(value, sort_keys=True)}
-                            for key, value in canonical["outcomes"].items()
+                            {"value": key, "description": description}
+                            for key, description in descriptions.items()
                         ],
                     }
                 ],
@@ -116,6 +120,72 @@ def payload_for(provider, canonical, model="jev-latest", zoom_question="choice")
             ],
         }
     raise ValueError("Unsupported provider")
+
+
+def request_contract_fingerprint(provider, payload):
+    """Hash task semantics, excluding provider transport/model identity.
+
+    Equal fingerprints prove equal submitted evidence/questions, not equal hidden
+    model defaults, weights, tokenization, or independent episode trajectories.
+    """
+    if provider == "jev":
+        questions = []
+        for name, original in payload["questions"].items():
+            question = dict(original)
+            if "criteria" in question:
+                question["choices"] = [
+                    {"value": key, "description": value}
+                    for key, value in question.pop("criteria").items()
+                ]
+            questions.append({"name": name, **question})
+        normalized = {"input": payload["state"], "questions": questions}
+    elif provider == "zoom":
+        value = payload["input"]
+        normalized = {
+            "input": json.loads(value) if isinstance(value, str) else value,
+            "questions": payload["questions"],
+        }
+    else:
+        raise ValueError("Only live provider requests have a contract fingerprint")
+    normalized["other_parameters"] = {
+        key: value
+        for key, value in payload.items()
+        if key not in ("model", "state", "input", "questions")
+    }
+    return hashlib.sha256(
+        json.dumps(normalized, sort_keys=True, allow_nan=False).encode()
+    ).hexdigest()
+
+
+def comparison_parameters(config):
+    """Explicit public controls; unknown service-side defaults are never inferred."""
+    zoom_question = config.get("zoom_question", "choice")
+    return {
+        "question_types": {"jev": "choice", "zoom": zoom_question},
+        "question_formats_match": zoom_question == "choice",
+        "objective_sha256": hashlib.sha256(OBJECTIVE.encode()).hexdigest(),
+        "model_selection": {
+            "jev": config.get("model_requested", "jev-latest"),
+            "zoom": "service default; no model selector in the supplied contract",
+        },
+        "decoding_parameters_sent": {"jev": {}, "zoom": {}},
+        "service_decoding_equivalence_verified": False,
+        "decoding_note": "Temperature, top-p, inference seed and output limits are not sent. Effective service defaults are unknown; emulator seed is not an inference seed.",
+        "identical_state_evaluation": config.get("track") == "identical_states",
+        "shared_evaluation_settings": {
+            key: config[key]
+            for key in (
+                "env",
+                "seed",
+                "seeds",
+                "episodes",
+                "simulation",
+                "limits",
+                "survival_guard",
+            )
+            if key in config
+        },
+    }
 
 
 def validate_scores(scores, candidates):
@@ -215,6 +285,7 @@ class Ranker:
         ranking = parse_ranking(self.provider, data, candidates, self.zoom_question)
         ranking.latency_ms = (time.perf_counter() - started) * 1000
         ranking.request = payload
+        ranking.request_contract_sha256 = request_contract_fingerprint(self.provider, payload)
         return ranking
 
 

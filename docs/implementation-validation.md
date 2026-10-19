@@ -123,3 +123,22 @@ v4, so it is a baseline rather than a measurement of this change.
 Validation: **89 tests passed**; lint, formatting, and whitespace checks passed.
 An uploaded v4 winning Zoom episode replayed all 2067 frames with zero API calls.
 No new live provider calls were made for v5.
+
+## Provider-parameter parity audit
+
+Audited the uploaded v5 batch: 215 Jev requests and 170 Zoom requests all used
+one shared objective, native choice, and descriptions matching their own canonical
+outcomes. The first request's normalized contract matched between providers in
+all five paired attempts. Later independent gameplay states can diverge.
+
+Both adapters now construct descriptions from one shared builder. Successful
+rankings log a normalized `request_contract_sha256`; config files explicitly
+record shared evaluation settings, question-format equivalence, model selection,
+and unknown service-side decoding defaults. No temperature, top-p, inference seed,
+or output limit is sent. This does not verify equal internal model settings.
+The shared v5 prompt and gameplay policy are unchanged.
+
+Validation: **49 relevant tests passed**, covering adapters, assisted/corpus runs,
+and real-time integration. Fingerprint mutation checks cover changed evidence,
+objective, choice order/descriptions, additional questions, and explicit sampling
+parameters. Lint, formatting, and whitespace checks passed. No live calls required.

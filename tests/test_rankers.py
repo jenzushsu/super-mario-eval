@@ -226,6 +226,9 @@ def test_native_choice_envelope_and_roundtrip(canonical, monkeypatch):
     assert result.semantics == "categorical_choice"
     assert result.metadata == {k: expected[k] for k in ("model", "request_id", "usage")}
     assert result.request["questions"][0]["type"] == "choice"
+    from mario_eval.rankers import request_contract_fingerprint
+
+    assert result.request_contract_sha256 == request_contract_fingerprint("zoom", result.request)
 
 
 @pytest.mark.parametrize(
@@ -273,3 +276,63 @@ def test_native_choice_preserves_service_tie_selection():
     for item in response["answers"][0]["probabilities"]:
         item["probability"] = 0.5
     assert parse_ranking("zoom", response, ("run", "jump")).candidate == "jump"
+
+
+def test_matching_request_fingerprints_cover_input_order_objective_and_controls(canonical):
+    import copy
+
+    from mario_eval.rankers import request_contract_fingerprint
+
+    jev = payload_for("jev", canonical)
+    zoom = payload_for("zoom", canonical)
+    assert set(jev) == {"model", "state", "questions"}
+    assert set(zoom) == {"input", "questions"}
+    expected = request_contract_fingerprint("jev", jev)
+    assert request_contract_fingerprint("zoom", zoom) == expected
+    extra = copy.deepcopy(jev)
+    extra["questions"]["additional"] = {"type": "predicate", "instructions": "Extra task"}
+    assert request_contract_fingerprint("jev", extra) != expected
+    assert (
+        request_contract_fingerprint(
+            "zoom", payload_for("zoom", canonical, zoom_question="predicate")
+        )
+        != expected
+    )
+    for change in ("state", "instructions", "order", "description", "temperature"):
+        altered = copy.deepcopy(zoom)
+        if change == "state":
+            state = json.loads(altered["input"])
+            state["state"]["x"] += 1
+            altered["input"] = json.dumps(state)
+        elif change == "instructions":
+            altered["questions"][0]["instructions"] = "Different objective"
+        elif change == "order":
+            altered["questions"][0]["choices"].reverse()
+        elif change == "description":
+            altered["questions"][0]["choices"][0]["description"] = "{}"
+        else:
+            altered["temperature"] = 0
+        assert request_contract_fingerprint("zoom", altered) != expected
+
+
+def test_comparison_settings_do_not_claim_unknown_model_defaults_match():
+    from mario_eval.rankers import comparison_parameters
+
+    config = {
+        "model_requested": "jev-1.13.0",
+        "zoom_question": "choice",
+        "track": "episodes",
+        "seed": 123,
+        "limits": {"timeout": 30},
+    }
+    result = comparison_parameters(config)
+    assert result["question_formats_match"]
+    assert result["decoding_parameters_sent"] == {"jev": {}, "zoom": {}}
+    assert not result["service_decoding_equivalence_verified"]
+    assert not result["identical_state_evaluation"]
+    assert result["model_selection"]["jev"] == "jev-1.13.0"
+    assert result["shared_evaluation_settings"]["seed"] == 123
+    config.update(zoom_question="predicate", track="identical_states")
+    result = comparison_parameters(config)
+    assert not result["question_formats_match"]
+    assert result["identical_state_evaluation"]
