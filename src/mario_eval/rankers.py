@@ -14,12 +14,16 @@ from dataclasses import dataclass, field
 
 from .simulation import rank_outcome
 
-PROMPT_VERSION = "outcome-ranker-v2"
+PROMPT_VERSION = "outcome-ranker-v3"
 OBJECTIVE = (
     "Choose the candidate that makes progress toward the flag without dying. "
     "Prefer a completion, then surviving moves with viable continuations. "
     "These are finite-horizon observations, not guarantees of future success. "
-    "Unknown outcomes are not evidence of death or safety."
+    "Unknown outcomes are not evidence of death or safety. "
+    "Use continuation_summary to distinguish complete, partial, and untested coverage. "
+    "Prefer viable future moves over immediate distance alone; partial fatal follow-ups do not prove a trap. "
+    "Use history to recognize repeated no-progress actions, while allowing useful waits and retreats. "
+    "Only your chosen move executes; follow-ups are hypothetical and must be selected on a later decision."
 )
 URLS = {
     "jev": "https://api.typesafe.ai/v1/systemone",

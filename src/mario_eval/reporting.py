@@ -90,6 +90,9 @@ def report(path, rows, track, offline, shared_validation=None):
                 "simulation_frames": sum(row["simulation_frames"] for row in selected),
                 "wall_seconds": sum(row["wall_seconds"] for row in selected),
                 "cost_usd": None,
+                "diagnostics": dict(
+                    sum((Counter(row.get("diagnostics", {})) for row in selected), Counter())
+                ),
             }
         )
     write_json(
@@ -118,6 +121,8 @@ def report(path, rows, track, offline, shared_validation=None):
         "| Policy | Samples | Outcomes | Median best x | API attempts | Median / p95 latency (ms) |",
         "|---|---:|---|---:|---:|---|",
     ]
+    if track == "identical_states":
+        lines = [line.replace("Median best x", "Median checkpoint x") for line in lines]
     for item in aggregate:
         latency = (
             "n/a"
@@ -147,6 +152,33 @@ def report(path, rows, track, offline, shared_validation=None):
         lines.append(
             f"| {row['policy']} / {row['attempt']} | {row['reason']} | {row['decisions']} | {row['game_frames']} / {row['game_frames'] / 60:.2f} | {row['simulation_frames']} | {row['wall_seconds']:.2f} |"
         )
+    lines += [
+        "",
+        "## Decision diagnostics",
+        "",
+        "Counts describe selected simulated moves, not observed future deaths or model accuracy.",
+        "",
+        "| Policy | Immediate death | All tested follow-ups fatal | Incomplete follow-ups | Non-forward | Repeated no progress |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for item in aggregate:
+        d = item["diagnostics"]
+        values = [
+            d.get(key, 0)
+            for key in (
+                "immediate_death",
+                "all_tested_followups_fatal",
+                "incomplete_followup_coverage",
+                "zero_progress",
+                "repeated_no_progress",
+            )
+        ]
+        lines.append(f"| {item['policy']} | " + " | ".join(map(str, values)) + " |")
+    lines += [
+        "",
+        "Repeated no progress means selecting nonpositive displacement after at least one horizon without a new best x. Retreats can trigger it; it is not an automatic override.",
+        "Complete follow-up coverage tests all seven moves for one horizon only; it does not prove eventual safety. Depth zero is explicitly untested.",
+    ]
     lines += [
         "",
         "## Interpretation",

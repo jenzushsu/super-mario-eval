@@ -197,7 +197,7 @@ reuse terms before copying code because the reviewed checkout has no LICENSE fil
 Implemented as `mario-eval assisted`, `capture`, `evaluate`, and `replay` while
 retaining the original direct-control command. The simulator is original code on
 the existing Python 3.13 stack. Initial macros use a 48-frame horizon, bounded
-landing/settling, and optionally three single-step continuations. No automatic
+landing/settling, and optionally all seven single-step continuations (`all-seven-v1`). No automatic
 escape or follow-up execution is implemented.
 
 Offline fixtures and the search-only baseline passed a bounded three-attempt

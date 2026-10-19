@@ -72,3 +72,65 @@ def test_negative_or_unsupported_settings_rejected():
         SimulationConfig(horizon=1)
     with pytest.raises(ValueError):
         SimulationConfig(continuation_depth=2)
+
+
+def test_history_is_restored_and_reconstructed_from_controls(sim):
+    from mario_eval.simulation import canonical_state
+
+    config = SimulationConfig(continuation_depth=0)
+    before = sim.checkpoint()
+    executed = sim.execute("run", config)
+    sim.execute("wait", config)
+    history = canonical_state(sim, {}, config)["history"]
+    assert history["recent_controls"]
+    checkpoint = sim.checkpoint()
+    sim.explore(config, budget())
+    assert canonical_state(sim, {}, config)["history"] == history
+    sim.restore(before)
+    for action in executed["actions"]:
+        sim.step(action)
+    simulated = canonical_state(sim, {}, config)["history"]
+    sim.restore(before)
+    sim.execute("run", config)
+    assert canonical_state(sim, {}, config)["history"] == simulated
+    sim.restore(checkpoint)
+
+
+def regression_cases():
+    import json
+    from pathlib import Path
+
+    return json.loads((Path(__file__).parent / "fixtures/mario_regressions.json").read_text())
+
+
+@pytest.mark.parametrize("case", regression_cases(), ids=lambda case: case["name"])
+def test_uploaded_failure_and_escape_states(sim, case):
+    from mario_eval.simulation import canonical_state
+
+    for action, count in case["prefix"]:
+        for _ in range(count):
+            sim.step(action)
+    assert sim.digest() == case["digest"]
+    history = canonical_state(sim, {}, SimulationConfig())["history"]
+    outcomes = sim.explore(SimulationConfig(), budget())
+    assert sim.digest() == case["digest"]
+    assert canonical_state(sim, {}, SimulationConfig())["history"] == history
+    for outcome in outcomes.values():
+        if outcome["status"] == "alive":
+            assert {v["id"] for v in outcome["continuations"]} == set(CANDIDATES)
+    from mario_eval.simulation import selection_diagnostics
+
+    evidence = canonical_state(sim, outcomes, SimulationConfig())
+    diagnostics = selection_diagnostics(evidence, case["candidate"])
+    assert diagnostics["all_tested_followups_fatal"] == (case["surviving_followup"] is None)
+    assert not diagnostics["incomplete_followup_coverage"]
+    selected = outcomes[case["candidate"]]
+    if case["surviving_followup"]:
+        follow = next(v for v in selected["continuations"] if v["id"] == case["surviving_followup"])
+        assert follow["status"] == "alive"
+    else:
+        assert all(v["status"] == "dead" for v in selected["continuations"])
+        assert any(
+            v["status"] == "alive" and any(c["status"] == "alive" for c in v["continuations"])
+            for v in outcomes.values()
+        )

@@ -45,7 +45,7 @@ uv run --frozen --env-file .env mario-eval assisted --zoom-question choice --epi
 predicate experiment, pass `--zoom-question predicate`. The selected type is
 saved in config.json and the exact request and score semantics are logged.
 Both modes preserve the same canonical evidence, candidates, and objective.
-The request version is `outcome-ranker-v2`; old logs retain their original version.
+The request version is `outcome-ranker-v3`; old logs retain their original version.
 Direct control (`mario-eval` without a subcommand) retains its predicate adapter.
 
 ## Predicate

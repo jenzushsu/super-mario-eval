@@ -37,3 +37,27 @@ joins workers before cleanup, desktop rendering stays on the main thread, and
 concurrent assisted trajectories replay without state contamination. Both desktop
 modes passed offline SDL smoke runs; screenshots were inspected. No additional
 live provider calls were made for this scheduling change.
+
+## Seven-move continuation coverage and shared history (2026-10-20)
+
+The `all-seven-v1` configuration tests every available follow-up move for each
+surviving candidate. `outcome-ranker-v3` sends both providers the same explicit
+coverage/survival summaries and reconstructed recent-control/no-progress history.
+There are no automatic move overrides. Old episode replay remains supported;
+old corpora require recapture because canonical evidence changed.
+
+- Full suite: **69 passed**, including five compressed action-prefix regression
+  fixtures from uploaded runs (two Zoom traps, Jev/Zoom wait escapes, and a Zoom
+  retreat). Fixtures contain controls and fingerprints, no credentials or ROM data.
+- Full coverage reproduces fatal continuations in the trap fixtures while finding
+  the previously omitted surviving wait in both escape fixtures. Lookahead restores
+  history; replay prefixes reconstruct it without contamination from simulation.
+- Offline search on World 1-1, seed 123: reached x=2227, then stalled at 27 decisions
+  and 1512 actual frames. Report counts seven non-forward selections, six repeated
+  no-progress selections. This improves on the earlier baseline's x=2010 death but
+  does not demonstrate level completion or live model improvement.
+- Three newly captured checkpoints passed offline identical-state evaluation;
+  the new 1512-frame trajectory replayed successfully.
+- An older uploaded winning Zoom log still replays 2187 frames with zero API calls.
+- Formatting, lint, and whitespace checks passed. No paid calls were made for this
+  change; new live Jev/Zoom outcomes remain to be measured on the revised evidence.

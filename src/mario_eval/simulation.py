@@ -15,7 +15,7 @@ from typesafe_mario.runner import create_mario_env
 
 ACTION_SET = "simple-macros-v1"
 CANDIDATES = ("run", "walk", "jump", "run_jump", "hop", "wait", "back")
-FOLLOW_UPS = ("run", "jump", "run_jump")
+FOLLOW_UPS = CANDIDATES
 
 
 @dataclass(frozen=True)
@@ -24,8 +24,11 @@ class SimulationConfig:
     landing_cap: int = 72
     settle: int = 4
     continuation_depth: int = 1
+    continuation_set: str = "all-seven-v1"
 
     def __post_init__(self):
+        if self.continuation_set != "all-seven-v1":
+            raise ValueError("Unsupported continuation set")
         if self.horizon < 40 or self.landing_cap < 0 or self.settle < 0:
             raise ValueError("horizon must be >=40; landing cap and settle must be nonnegative")
         if self.continuation_depth not in (0, 1):
@@ -75,6 +78,8 @@ class MarioSimulator:
         self.frames = 0
         self.reward = 0.0
         self.best_x = self.x
+        self.last_gain_frame = 0
+        self.recent_controls = []
         self.chain = []
         wrapper = self.env
         while True:
@@ -134,10 +139,14 @@ class MarioSimulator:
             self.frames,
             self.reward,
             self.best_x,
+            self.last_gain_frame,
+            copy.deepcopy(self.recent_controls),
         )
 
     def restore(self, checkpoint):
-        native, states, frame, info, term, trunc, frames, reward, best = checkpoint
+        native, states, frame, info, term, trunc, frames, reward, best, last_gain, history = (
+            checkpoint
+        )
         self.core.load_state(native)
         for wrapper, state in zip(self.chain, states, strict=True):
             for key, value in state.items():
@@ -151,6 +160,8 @@ class MarioSimulator:
         self.frame, self.info = frame.copy(), copy.deepcopy(info)
         self.terminated, self.truncated = term, trunc
         self.frames, self.reward, self.best_x = frames, reward, best
+        self.last_gain_frame = last_gain
+        self.recent_controls = copy.deepcopy(history)
 
     def digest(self):
         metadata = json.dumps(
@@ -189,13 +200,25 @@ class MarioSimulator:
     def step(self, action):
         if self.done:
             raise ValueError("Cannot step a terminated episode")
+        before_x = self.x
         frame, reward, term, trunc, info = self.env.step(ACTION_TO_INDEX[Action(action)])
         self.frame, self.info = frame.copy(), _plain(info)
         self.last_action = str(action)
         self.terminated, self.truncated = bool(term), bool(trunc)
         self.frames += 1
         self.reward += float(reward)
+        if self.x > self.best_x:
+            self.last_gain_frame = self.frames
         self.best_x = max(self.best_x, self.x)
+        if self.recent_controls and self.recent_controls[-1]["action"] == str(action):
+            recent = self.recent_controls[-1]
+            recent["frames"] += 1
+            recent["dx"] += self.x - before_x
+        else:
+            self.recent_controls.append(
+                {"action": str(action), "frames": 1, "dx": self.x - before_x}
+            )
+            self.recent_controls = self.recent_controls[-8:]
 
     def execute(self, candidate, config, before_step=lambda: None, on_frame=lambda: None):
         if candidate not in CANDIDATES:
@@ -309,17 +332,25 @@ def canonical_state(sim, outcomes, config):
         "action_set": ACTION_SET,
         "simulation": asdict(config),
         "state": sim.state(),
+        "history": {
+            "recent_controls": copy.deepcopy(sim.recent_controls),
+            "frames_since_best_x": sim.frames - sim.last_gain_frame,
+            "note": "Actual executed controls only; consecutive identical controls are grouped. No new best x includes deliberate retreat.",
+        },
         "outcomes": {
             name: {
-                k: value[k]
-                for k in (
-                    "status",
-                    "dx",
-                    "frames",
-                    "grounded",
-                    "x_after",
-                    "continuations",
-                )
+                "continuation_summary": continuation_summary(value),
+                **{
+                    k: value[k]
+                    for k in (
+                        "status",
+                        "dx",
+                        "frames",
+                        "grounded",
+                        "x_after",
+                        "continuations",
+                    )
+                },
             }
             for name, value in outcomes.items()
         },
@@ -336,3 +367,42 @@ def rank_outcome(outcome):
         outcome["dx"],
         len(viable),
     )
+
+
+def continuation_summary(outcome):
+    followups = outcome["continuations"]
+    tested = {v["id"] for v in followups}
+    surviving = [v["id"] for v in followups if v["status"] in ("alive", "clear")]
+    fatal = [v for v in followups if v["status"] == "dead"]
+    return {
+        "tested": len(tested),
+        "available": len(CANDIDATES),
+        "coverage": "complete"
+        if tested == set(CANDIDATES)
+        else "partial"
+        if tested
+        else "not_tested",
+        "surviving": surviving,
+        "fatal": len(fatal),
+        "unknown": sum(v["status"] == "unknown" for v in followups),
+        "all_tested_fatal": bool(followups) and len(fatal) == len(followups),
+        "earliest_fatal_frames": min((v["frames"] for v in fatal), default=None),
+    }
+
+
+def selection_diagnostics(canonical, candidate):
+    outcome = canonical["outcomes"][candidate]
+    followups = continuation_summary(outcome)
+    return {
+        "immediate_death": outcome["status"] == "dead",
+        "fatal_when_survivor_available": outcome["status"] == "dead"
+        and any(v["status"] in ("alive", "clear") for v in canonical["outcomes"].values()),
+        "all_tested_followups_fatal": followups["all_tested_fatal"],
+        "incomplete_followup_coverage": outcome["status"] == "alive"
+        and followups["coverage"] != "complete",
+        "zero_progress": outcome["dx"] <= 0 and outcome["status"] != "clear",
+        "repeated_no_progress": outcome["dx"] <= 0
+        and outcome["status"] != "clear"
+        and canonical.get("history", {}).get("frames_since_best_x", 0)
+        >= canonical["simulation"]["horizon"],
+    }

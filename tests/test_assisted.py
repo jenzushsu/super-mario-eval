@@ -49,6 +49,8 @@ def test_offline_episode_partial_execution_and_replay(tmp_path, monkeypatch):
     root = next(tmp_path.iterdir())
     summary = json.loads((root / "summary.json").read_text())
     assert len(summary["runs"]) == 3
+    assert all("diagnostics" in row for row in summary["runs"])
+    assert "## Decision diagnostics" in (root / "report.md").read_text()
     assert {row["reason"] for row in summary["runs"]} == {"game_frame_cap"}
     assert {row["api_attempts"] for row in summary["runs"]} == {0}
     assert {row["game_frames"] for row in summary["runs"]} == {3}
@@ -86,6 +88,17 @@ def test_corpus_evaluation_and_tamper_detection(tmp_path, monkeypatch):
         config["corpus_sha256"] == hashlib.sha256((output / "corpus.json").read_bytes()).hexdigest()
     )
     assert config["limits"]["max_decisions"] == 1
+    assert config["simulation"]["continuation_set"] == "all-seven-v1"
+    assert "history" in events[0]["canonical"]
+    assert all("diagnostics" in event for event in events)
+    legacy = dict(corpus)
+    legacy["simulation"] = {
+        k: v for k, v in corpus["simulation"].items() if k != "continuation_set"
+    }
+    legacy_path = tmp_path / "legacy-corpus.json"
+    legacy_path.write_text(json.dumps(legacy))
+    with pytest.raises(ValueError, match="recapture"):
+        assisted.evaluate_corpus(options(tmp_path / "legacy-eval", corpus=legacy_path))
     summary = json.loads((output / "summary.json").read_text())
     assert summary["shared_validation"]["simulation_frames"] > 0
     assert summary["shared_validation"]["wall_seconds"] > 0

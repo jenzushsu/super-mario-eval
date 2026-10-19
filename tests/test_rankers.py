@@ -12,6 +12,10 @@ from mario_eval.rankers import ProviderError, Ranker, parse_ranking, payload_for
 def canonical():
     return {
         "state": {"x": 40},
+        "history": {
+            "recent_controls": [{"action": "right", "frames": 52, "dx": 0}],
+            "frames_since_best_x": 52,
+        },
         "outcomes": {
             "run": {"status": "dead", "dx": 100, "continuations": []},
             "jump": {"status": "alive", "dx": 80, "continuations": []},

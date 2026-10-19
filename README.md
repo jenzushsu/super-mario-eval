@@ -138,8 +138,10 @@ and mixed-question contracts. Native choice gameplay improvement is not yet veri
 ### Budgets and assistance
 
 Seven versioned macros use a 48-frame horizon, up to 72 extra landing frames,
-and four neutral settling frames. `--depth 1` (default) evaluates three single-move
-continuations per surviving candidate. Only the selected candidate is executed;
+and four neutral settling frames. `--depth 1` (default) evaluates all seven single-move
+continuations per surviving candidate, including walk, hop, wait, and back.
+This is recorded as `continuation_set: all-seven-v1` and costs more simulation
+work than the older three-continuation experiment. Only the selected candidate is executed;
 continuations provide evidence, not automatic actions. `--depth 0` is faster but
 changes the experiment. Airborne or truncated outcomes are recorded as unknown,
 not silently classified as fatal or safe.
@@ -149,6 +151,27 @@ Defaults per policy/episode: `--max-decisions 25`, `--game-frames 3600`,
 `--timeout 30`. Simulation frames and actual game frames have separate caps.
 A stall means no new best position within the configured actual frame interval.
 Simulation can take much longer than the resulting gameplay; its status is visible.
+
+### Shared history and continuation evidence
+
+Both providers receive the same `outcome-ranker-v3` instructions and fields:
+
+- `history.recent_controls`: the last eight groups of actual controller buttons,
+  with their frame counts and displacement. These are executed controls, not
+  hypothetical rollouts or a record of the model's reasoning.
+- `history.frames_since_best_x`: actual frames without a new farthest position.
+  Retreats and useful waiting can increase this counter too.
+- Each outcome's `continuation_summary`: tested/available counts, surviving move
+  names, fatal/unknown counts, coverage, and earliest fatal follow-up frame.
+
+Complete coverage means every available move was tested for one bounded follow-up,
+not that long-term safety is known. Depth zero and unexpanded outcomes are explicitly
+untested. The history is reconstructed from recorded controls and restored after
+lookahead, so hypothetical actions never pollute the next request.
+
+No safety filter, forced escape, or automatic follow-up overrides either provider.
+Instructions encourage survival over immediate distance, while recognizing stalls
+and the limitations of partial evidence. Both providers receive the same changes.
 
 ### Read the report
 
@@ -168,7 +191,18 @@ scores nor legacy independent-predicate scores are calibrated across providers.
 Legacy predicate scores must not be treated as a categorical distribution.
 Offline fixtures are never included as live model measurements.
 
+The **Decision diagnostics** table and each ranking event distinguish immediate
+predicted death, all tested follow-ups fatal, incomplete follow-up coverage,
+non-forward selections, and repeated no progress. The last metric counts selecting
+nonpositive displacement after at least one horizon without a new best position;
+it can flag deliberate retreats. These are diagnostics, not model accuracy or
+proof that an episode must fail. In identical-state reports, checkpoint x is the
+input position, not progress achieved by a provider.
+
 ### Compare decisions on identical states
+
+**Recapture corpora made before `all-seven-v1`.** Evaluation rejects old corpora
+rather than silently change their evidence. Old episode logs still support replay.
 
 Capture a bounded search trajectory without keys, then evaluate the frozen
 checkpoints with both services and the deterministic baseline:

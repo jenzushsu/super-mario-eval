@@ -6,6 +6,7 @@ import hashlib
 import json
 import threading
 import time
+from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from .simulation import (
     SimulationConfig,
     WorkBudget,
     canonical_state,
+    selection_diagnostics,
 )
 
 
@@ -122,6 +124,7 @@ def summary(lane, attempt):
         + (time.monotonic() - lane["active_start"] if lane["active_start"] is not None else 0),
         "error": lane.get("error"),
         "cost_usd": None,
+        "diagnostics": dict(lane["diagnostics"]),
     }
 
 
@@ -188,6 +191,7 @@ def episode_run(args, capture=False):
                         "reason": None,
                         "wall_used": 0.0,
                         "active_start": None,
+                        "diagnostics": Counter(),
                         "decisions": 0,
                         "api_attempts": 0,
                         "latencies": [],
@@ -283,8 +287,15 @@ def episode_run(args, capture=False):
                             lane["display"].update(
                                 action=ranking.candidate, latency=ranking.latency_ms
                             )
+                            diagnostics = selection_diagnostics(canonical, ranking.candidate)
+                            lane["diagnostics"].update(
+                                {key: int(value) for key, value in diagnostics.items()}
+                            )
                             journal.emit(
-                                "ranking", decision_index=lane["decisions"], **asdict(ranking)
+                                "ranking",
+                                decision_index=lane["decisions"],
+                                diagnostics=diagnostics,
+                                **asdict(ranking),
                             )
                             applied = []
                             execution_start = sim.digest()
@@ -527,6 +538,10 @@ def evaluate_corpus(args):
     source = args.corpus.read_bytes()
     corpus = json.loads(source)
     compatible(corpus)
+    if corpus.get("simulation", {}).get("continuation_set") != "all-seven-v1":
+        raise ValueError(
+            "Corpus predates all-seven continuation/history evidence; recapture it. Old episode logs can still be replayed."
+        )
     if not corpus.get("cases"):
         raise ValueError("Corpus contains no decision states")
     policies = (
@@ -683,6 +698,9 @@ def evaluate_corpus(args):
                         v["status"] in ("alive", "clear") for v in canonical["outcomes"].values()
                     )
                     event["selected_dx"] = selected["dx"]
+                    diagnostics = selection_diagnostics(canonical, ranking.candidate)
+                    event["diagnostics"] = diagnostics
+                    row["diagnostics"] = {key: int(value) for key, value in diagnostics.items()}
                     row.update(reason="ranked", decisions=1)
                     if policy in ("jev", "zoom"):
                         row["latencies_ms"] = [ranking.latency_ms]
