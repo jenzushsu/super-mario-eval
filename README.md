@@ -13,11 +13,13 @@ Complete [local setup](#run-locally) first. All live commands need both API keys
 | --- | --- | --- | --- |
 | **Assisted native choice** (default) | Current state plus measured outcomes of seven simulated moves | One `choice` among those moves | Compare Jev and Zoom on the same action-selection task during gameplay |
 | **Assisted predicates** (legacy) | The same state and simulated outcomes | Seven independent “is this the best move?” predicates | Compare Zoom request formats against the older implementation |
+| **Real-time assisted** | Simulated outcomes from an earlier snapshot; live game continues while planning | `choice` or `predicate` | Measure latency-sensitive gameplay without inference pauses |
 | **Direct control** | Parsed current game state, without simulated future outcomes | Seven independent action predicates | Evaluate the original controllers; Jev also makes extra judgments |
 | **Identical-state evaluation** | The same frozen checkpoints and simulated outcomes for every policy | `choice` or `predicate` | Compare decisions without confounding them with different gameplay trajectories |
 | **Offline fixtures / search** | Game state or simulated outcomes, depending on mode | No API calls | Validate the harness, capture states, and establish a deterministic baseline |
 
-Direct and assisted episodes run independent lanes in parallel. Each emulator
+Direct and assisted episodes run independent lanes in parallel.
+Use `realtime` for continuous gameplay while decisions are pending; see below. Each emulator
 pauses during its own inference; the other lane can keep playing. Identical-state
 `evaluate` is a headless, case-by-case ranking workflow, not parallel gameplay.
 Neither parallel scheduling nor assistance guarantees a level clear. Keep direct,
@@ -43,10 +45,43 @@ uv run --frozen --env-file .env mario-eval assisted --zoom-question predicate --
 uv run --frozen --env-file .env mario-eval --max-decisions 250
 ```
 
-`--zoom-question` applies only to `assisted` and `evaluate`; it does not change the
+`--zoom-question` applies to `assisted`, `realtime`, and `evaluate`; it does not change the
 direct controller. Add `--headless` to any of these commands to omit the window.
 Every invocation creates a separate artifact directory, so keep both directories
 when comparing formats. The two assisted commands keep Jev's task unchanged.
+
+### Continuous live playback (real-time mode)
+
+```sh
+uv run --frozen --env-file .env mario-eval realtime --zoom-question choice --episodes 1 --max-decisions 100 --wall-seconds 600 --depth 0
+```
+
+This mode keeps each emulator running while a separate emulator simulates options
+and its provider decides. Desktop rendering and live game steps target 60 FPS.
+Mario begins with neutral controls until the first reply; then the last selected
+move continues until a new reply arrives. Jump holds release after 8/32 frames,
+so waiting for the next reply does not continually retrigger jumps.
+
+`--depth 0` reduces planning latency by omitting follow-up lookahead. Use `--depth 1`
+for all-seven continuation evidence, at higher simulation cost. Compare runs only
+with matching depth and limits. Slow hardware can reduce actual FPS; no emulator
+frames are skipped to catch up. `--headless` also keeps real-time pacing.
+
+Unlike paused `assisted` mode, latency now affects survival. Predictions describe
+an older snapshot, so their execution-parity guarantee does not apply to the live
+game. The runner applies replies on arrival, logs `observed_frame`, `applied_frame`,
+and `decision_age_frames`, and discards outstanding replies when an episode ends.
+The separate `realtime` report includes median/maximum decision age, API errors,
+bootstrap/held controls, and replayable action sequences. Do not combine these
+results with paused assisted rankings. There are no automatic escape overrides.
+The decision cap ends after the last selected move has run for at least one horizon;
+frame, stall, terminal, and wall-time limits may stop it sooner.
+
+For a no-key desktop check:
+
+```sh
+uv run --frozen mario-eval realtime --offline --episodes 1 --max-decisions 2 --depth 0
+```
 
 ### Available Zoom request types
 
@@ -122,7 +157,12 @@ another lane’s response or move. Each emulator pauses only during its own
 simulation and API calls. API latency excludes simulation; per-lane wall time
 includes its own simulation, requests, execution, and CPU contention. Faster
 responses can produce faster wall-clock progress, without advancing game time
-while that lane is waiting. The three-attempt smoke benchmark
+while that lane is waiting. Desktop rendering and move playback target 60 FPS,
+with processing time included in each frame interval. Slow machines can achieve
+less; emulator frames are never skipped to catch up. Simulation/API pauses are
+intentional, so this is smooth playback between decisions, not uninterrupted
+real-time gameplay. Headless runs do not throttle emulator playback.
+The three-attempt smoke benchmark
 is not a statistically conclusive performance study.
 
 ### Zoom question format

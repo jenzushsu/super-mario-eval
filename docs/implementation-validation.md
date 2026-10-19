@@ -61,3 +61,22 @@ old corpora require recapture because canonical evidence changed.
 - An older uploaded winning Zoom log still replays 2187 frames with zero API calls.
 - Formatting, lint, and whitespace checks passed. No paid calls were made for this
   change; new live Jev/Zoom outcomes remain to be measured on the revised evidence.
+
+## Continuous real-time playback (2026-10-20)
+
+- Removed the assisted display's 20 FPS cap. Rendering and playback use deadline
+  pacing targeting 60 FPS; the paused-mode SDL smoke measured a median draw
+  interval of 16.7 ms. Slow frames do not cause emulator-frame skipping.
+- Added a separate `realtime` track with live emulators and isolated planning
+  emulators. Neutral controls bootstrap the first decision; selected moves then
+  continue during inference. Decision ages and discarded replies are recorded.
+- **75 tests passed**, including gameplay advancement during blocked inference,
+  cancellation/cleanup, stale decision ages, held jump release, provider failure
+  isolation, and replay of real-time control sequences.
+- Both direct and assisted desktop smoke runs passed. The real-time SDL smoke
+  completed two fixture decisions per lane; the first lane's 165-frame trajectory
+  replayed successfully. Its screenshot was inspected. These are offline checks,
+  not evidence of live model performance or level completion.
+- `--depth 0` is documented for lower planning latency. Full continuation search
+  remains available via `--depth 1`. Real-time results must remain separate from
+  paused assisted comparisons because latency changes the game state.

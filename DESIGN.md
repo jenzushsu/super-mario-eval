@@ -15,3 +15,7 @@ Assisted mode inherits this desktop layout. The subtitle identifies parallel exe
 independently shows whether its policy is simulating, waiting, or executing; search runs appear in the report
 while the two primary panels remain Jev and Zoom. Offline fixtures are explicitly
 named in both headers. No new visual system or browser surface is introduced.
+
+Real-time playback targets 60 FPS. The subtitle explicitly identifies real-time
+mode; panels show that a new decision is pending while the current move executes.
+Only the main thread renders and processes desktop input.

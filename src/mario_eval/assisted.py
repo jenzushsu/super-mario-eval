@@ -10,7 +10,7 @@ from collections import Counter
 from dataclasses import asdict
 from pathlib import Path
 
-from .concurrency import run_workers
+from .concurrency import FramePacer, run_workers
 from .rankers import ProviderError, Ranker, payload_for
 from .reporting import SCHEMA, Journal, new_run, provenance, report, write_json
 from .simulation import (
@@ -33,7 +33,6 @@ class Display:
         self.view = None
         self.rows = []
         self.cancelled = False
-        self.last_draw = 0.0
         self.context = "Assisted outcome ranking"
         if enabled:
             from .cli import View
@@ -46,11 +45,10 @@ class Display:
     def refresh(self, force=False):
         if threading.get_ident() != self.owner:
             return self.cancelled
-        if self.view and self.rows and (force or time.monotonic() - self.last_draw > 0.05):
+        if self.view and self.rows:
             with self.lock:
                 rows = [dict(row) for row in self.rows[:2]]
             self.cancelled |= not self.view.draw(rows, "Assisted")
-            self.last_draw = time.monotonic()
         return self.cancelled
 
     def update(self, lane, status):
@@ -312,8 +310,14 @@ def episode_run(args, capture=False):
                                 if sim.frames - lane["last_gain"] >= args.stall_frames:
                                     raise BudgetStop("stalled")
 
+                            playback = FramePacer() if display.view else None
+
                             def on_frame(
-                                lane=lane, sim=sim, applied=applied, airborne_case=airborne_case
+                                lane=lane,
+                                sim=sim,
+                                applied=applied,
+                                airborne_case=airborne_case,
+                                playback=playback,
                             ):
                                 applied.append(sim.last_action)
                                 if (
@@ -332,8 +336,8 @@ def episode_run(args, capture=False):
                                         sim.best_x,
                                     )
                                 display.update(lane, "Executing")
-                                if display.view:
-                                    time.sleep(1 / 60)
+                                if playback:
+                                    playback.tick()
 
                             try:
                                 result = sim.execute(
@@ -769,7 +773,9 @@ def positive(value):
 
 def main(argv):
     parser = argparse.ArgumentParser(description="Assisted Mario outcome-ranking evaluation")
-    parser.add_argument("command", choices=("assisted", "capture", "evaluate", "replay"))
+    parser.add_argument(
+        "command", choices=("assisted", "realtime", "capture", "evaluate", "replay")
+    )
     parser.add_argument("file", nargs="?", type=Path)
     parser.add_argument(
         "--offline", action="store_true", help="Deterministic fixtures, not model results"
@@ -795,17 +801,21 @@ def main(argv):
         "--zoom-question",
         choices=("choice", "predicate"),
         default="choice",
-        help="Zoom assisted/evaluate question type (default: native choice)",
+        help="Zoom assisted/realtime/evaluate question type (default: native choice)",
     )
     parser.add_argument("--artifacts-dir", type=Path, default=Path("artifacts"))
     args = parser.parse_args(argv)
-    if args.screenshot and (args.headless or args.command != "assisted"):
+    if args.screenshot and (args.headless or args.command not in ("assisted", "realtime")):
         parser.error(
-            "--screenshot needs the assisted desktop display (SDL dummy display is supported)"
+            "--screenshot needs an assisted or realtime desktop display (SDL dummy display is supported)"
         )
     if args.command in ("replay", "evaluate") and not args.file:
         parser.error("This command requires an artifact file path")
     try:
+        if args.command == "realtime":
+            from .realtime import run
+
+            return run(args)
         if args.command == "replay":
             return replay(args.file)
         if args.command == "evaluate":

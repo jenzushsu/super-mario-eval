@@ -16,7 +16,7 @@ from typesafe_mario.policy import HeuristicPolicy, TypeSafePolicy
 from typesafe_mario.runner import _unwrap_ram, create_mario_env
 from typesafe_mario.state import MarioStateParser
 
-from .concurrency import run_workers
+from .concurrency import FramePacer, run_workers
 from .zoom import ZoomAPIError, ZoomPolicy
 
 
@@ -176,6 +176,7 @@ def run(args):
                 lane["decision"] = decision
                 lane["executed_actions"] = []
                 lane["status"] = "Running"
+                playback = FramePacer(wait=stopped.wait) if view else None
                 for _frame in range(args.frames_per_decision):
                     if lane["done"] or stopped.is_set():
                         break
@@ -210,8 +211,8 @@ def run(args):
                             if truncated
                             else "Episode ended"
                         )
-                    if view:
-                        stopped.wait(1 / 60)
+                    if playback:
+                        playback.tick()
                 lane["count"] += 1
                 record = {
                     "decision_index": lane["count"],
@@ -287,7 +288,13 @@ def run(args):
 
 
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] in {"assisted", "capture", "evaluate", "replay"}:
+    if len(sys.argv) > 1 and sys.argv[1] in {
+        "assisted",
+        "realtime",
+        "capture",
+        "evaluate",
+        "replay",
+    }:
         from .assisted import main as assisted_main
 
         return assisted_main(sys.argv[1:])

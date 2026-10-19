@@ -14,3 +14,8 @@ and JSON action replay support reproducibility. Direct mode remains distinct.
 Both direct and assisted episode modes run independent parallel lanes. A slow
 provider cannot hold the other lane at a shared decision barrier. Each emulator
 pauses for its own inference; desktop rendering stays on the main thread.
+
+Real-time mode is a separate latency-sensitive track: live emulators keep stepping
+while isolated planner emulators and providers work on older snapshots. It reports
+decision age and bootstrap/held controls; it must not share a leaderboard with
+paused assisted evaluation.

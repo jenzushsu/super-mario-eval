@@ -9,6 +9,7 @@ import subprocess
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Lock
 from uuid import uuid4
 
 from .rankers import PROMPT_VERSION
@@ -57,13 +58,15 @@ def new_run(root, config):
 
 class Journal:
     def __init__(self, path):
+        self.lock = Lock()
         self.handle = Path(path).open("w", encoding="utf-8")  # noqa: SIM115 — explicitly closed with episode lifecycle
 
     def emit(self, event, **values):
-        self.handle.write(
-            json.dumps({"schema": SCHEMA, "event": event, **values}, allow_nan=False) + "\n"
-        )
-        self.handle.flush()
+        with self.lock:
+            self.handle.write(
+                json.dumps({"schema": SCHEMA, "event": event, **values}, allow_nan=False) + "\n"
+            )
+            self.handle.flush()
 
     def close(self):
         self.handle.close()
@@ -95,6 +98,15 @@ def report(path, rows, track, offline, shared_validation=None):
                 ),
             }
         )
+    for item in aggregate:
+        ages = [
+            age
+            for row in rows
+            if row["policy"] == item["policy"]
+            for age in row.get("decision_age_frames", [])
+        ]
+        item["decision_age_p50_frames"] = statistics.median(ages) if ages else None
+        item["decision_age_max_frames"] = max(ages) if ages else None
     write_json(
         path / "summary.json",
         {
@@ -191,4 +203,27 @@ def report(path, rows, track, offline, shared_validation=None):
         "- Each JSONL contains the initial fingerprint, canonical evidence, sanitized request body, chosen move, actual controls, and final state.",
         "- Unavailable model identifiers or usage are unknown. Errors are not scored as gameplay deaths.",
     ]
+    if track == "realtime":
+        lines = [
+            line.replace(
+                "Game time pauses during both.", "Game time continues during both."
+            ).replace(
+                "Each lane pauses its own game time during both; episode lanes run independently in parallel.",
+                "Game time continues during simulation and inference. Latency affects survival.",
+            )
+            for line in lines
+        ]
+        lines += [
+            "",
+            "## Real-time decision age",
+            "",
+            "This is a separate latency-sensitive track. Bootstrap is neutral; then the last move continues while the next decision is pending. Predictions describe an older snapshot and need not match live execution.",
+            "",
+            "| Policy | Median age (frames) | Maximum age (frames) |",
+            "|---|---:|---:|",
+        ]
+        for item in aggregate:
+            lines.append(
+                f"| {item['policy']} | {item['decision_age_p50_frames']} | {item['decision_age_max_frames']} |"
+            )
     (path / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
