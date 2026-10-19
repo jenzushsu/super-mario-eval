@@ -3,8 +3,64 @@
 Two Super Mario Bros. episodes side by side: **TypeSafe Jev** and **Zoom Decisions**.
 Uses [fhshaik/typesafe-mario](https://github.com/fhshaik/typesafe-mario) at commit
 `ca22449ed187118d19326d1f54b01b6636578aa4` for the emulator, state parser, actions,
-and unmodified Jev policy. Upstream source is installed as a dependency, not copied.
+and, in direct mode, the unmodified Jev policy. Upstream source is installed as a dependency, not copied.
 
+## Choose an approach
+
+Complete [local setup](#run-locally) first. All live commands need both API keys.
+
+| Approach | What the services receive | Zoom question | Use it to |
+| --- | --- | --- | --- |
+| **Assisted native choice** (default) | Current state plus measured outcomes of seven simulated moves | One `choice` among those moves | Compare Jev and Zoom on the same action-selection task during gameplay |
+| **Assisted predicates** (legacy) | The same state and simulated outcomes | Seven independent “is this the best move?” predicates | Compare Zoom request formats against the older implementation |
+| **Direct control** | Parsed current game state, without simulated future outcomes | Seven independent action predicates | Evaluate the original controllers; Jev also makes extra judgments |
+| **Identical-state evaluation** | The same frozen checkpoints and simulated outcomes for every policy | `choice` or `predicate` | Compare decisions without confounding them with different gameplay trajectories |
+| **Offline fixtures / search** | Game state or simulated outcomes, depending on mode | No API calls | Validate the harness, capture states, and establish a deterministic baseline |
+
+Direct and assisted episodes run independent lanes in parallel. Each emulator
+pauses during its own inference; the other lane can keep playing. Identical-state
+`evaluate` is a headless, case-by-case ranking workflow, not parallel gameplay.
+Neither parallel scheduling nor assistance guarantees a level clear. Keep direct,
+assisted, and offline results separate.
+
+### Run each gameplay approach
+
+**Assisted native choice — recommended starting point:**
+
+```sh
+uv run --frozen --env-file .env mario-eval assisted --zoom-question choice --episodes 1 --max-decisions 100 --wall-seconds 600
+```
+
+**Assisted independent predicates — same budgets, older Zoom format:**
+
+```sh
+uv run --frozen --env-file .env mario-eval assisted --zoom-question predicate --episodes 1 --max-decisions 100 --wall-seconds 600
+```
+
+**Original direct control — no lookahead:**
+
+```sh
+uv run --frozen --env-file .env mario-eval --max-decisions 250
+```
+
+`--zoom-question` applies only to `assisted` and `evaluate`; it does not change the
+direct controller. Add `--headless` to any of these commands to omit the window.
+Every invocation creates a separate artifact directory, so keep both directories
+when comparing formats. The two assisted commands keep Jev's task unchanged.
+
+### Available Zoom request types
+
+| API type | Response meaning | Use in this project |
+| --- | --- | --- |
+| `choice` | Explicit selected value plus probabilities over the listed choices | Default assisted/evaluate action selection; honors the returned choice |
+| `predicate` | An independent probability for each named yes/no question | Legacy assisted/evaluate option and the direct controller |
+| `score` | A fractional score over ordered levels, plus level probabilities | Documented only; no gameplay option implemented |
+| Mixed questions | Named, typed answers for choice, predicate, and score in one call | Documented only; no mixed-question gameplay option implemented |
+
+Score examples use zero-based level indices, with the score matching their
+probability-weighted mean. Predicate probabilities are not a categorical
+distribution. Neither provider's scores should be treated as calibrated against
+the other's. See [request and response examples](docs/zoom-api.md).
 
 ## Assisted comparison (new)
 
@@ -15,7 +71,21 @@ uses our existing Python 3.13 emulator stack. It includes a deterministic
 search-only baseline, no automatic escape moves, and no unselected follow-ups.
 The original commands below still run **direct control**, a separate benchmark.
 
-After local setup and `.env` configuration below, try a short offline run:
+After [local setup and `.env` configuration](#run-locally), run the live assisted
+comparison with this command (works in macOS/Linux shells and Windows PowerShell):
+
+```sh
+uv run --frozen --env-file .env mario-eval assisted --episodes 1 --max-decisions 100 --wall-seconds 600
+```
+
+This loads `TYPESAFE_API_KEY` and `ZOOM_API_KEY` from `.env` and runs Jev, Zoom,
+and the search baseline independently in parallel. Jev and Zoom appear side by
+side; the baseline is included in the report. Add `--headless` to run without a
+window. These limits allow a longer attempt but do not guarantee a level clear;
+the other budgets below still apply. **Include `assisted`: omitting it starts
+the original direct-control mode.**
+
+For a short offline run without API keys:
 
 ```sh
 uv run --frozen mario-eval assisted --offline --episodes 1 --max-decisions 3
@@ -45,7 +115,8 @@ continuation above is for macOS/Linux shells).
 
 Every attempt uses matching level and seed across Jev, Zoom, and search. Episodes
 are independent, so states diverge after different choices. Lookahead supplies
-assistance: completion is not evidence of unaided gameplay. Each lane independently simulates outcomes, requests a decision, and executes
+assistance: completion is not evidence of unaided gameplay. Each lane independently
+simulates outcomes, requests a decision, and executes
 its move. Jev, Zoom, and the search baseline run concurrently; no lane waits for
 another lane’s response or move. Each emulator pauses only during its own
 simulation and API calls. API latency excludes simulation; per-lane wall time
@@ -94,7 +165,8 @@ Logs flush incrementally and reports retain partial episodes on cancellation or
 provider failure. Provider usage is preserved when returned. Cost stays **unknown**
 until a provider-specific pricing calculation is implemented. Neither native-choice
 scores nor legacy independent-predicate scores are calibrated across providers.
-Legacy predicate scores must not be treated as a categorical distribution. Offline fixtures are never included as live model measurements.
+Legacy predicate scores must not be treated as a categorical distribution.
+Offline fixtures are never included as live model measurements.
 
 ### Compare decisions on identical states
 
@@ -111,6 +183,21 @@ Replace `<capture-run-id>` with the printed directory. Add `--offline` to the
 action prefixes and geometry tags, includes an airborne sample when encountered,
 and lists missing scene coverage. A short trajectory is not a balanced benchmark;
 inspect `coverage` and `missing_coverage` before drawing conclusions.
+
+For a controlled choice-versus-predicate comparison, use the **same corpus file**
+and identical limits in both commands (replace the placeholder path):
+
+```sh
+uv run --frozen --env-file .env mario-eval evaluate artifacts/<capture-run-id>/corpus.json --zoom-question choice --max-decisions 3 --wall-seconds 600
+uv run --frozen --env-file .env mario-eval evaluate artifacts/<capture-run-id>/corpus.json --zoom-question predicate --max-decisions 3 --wall-seconds 600
+```
+
+Each command calls both providers on up to three cases, plus the zero-API search
+baseline. Jev is called again in the second run; its responses can vary. Compare
+Zoom's selected moves, simulated survival/continuations, progress, and latency
+across the two directories. Confirm matching `corpus_sha256` and simulation
+settings in config.json. The existing captured corpus follows search's trajectory;
+it does not automatically include failure states from uploaded provider logs.
 
 Evaluation first replays and re-simulates each checkpoint, rejecting changed
 fingerprints or outcomes before scoring that case. Results include `rankings.jsonl`,
@@ -236,6 +323,16 @@ seven-predicate request succeeded in user-supplied runs; verify access with your
 
 ### 5. Open the live side-by-side comparison
 
+For the **assisted comparison**, run:
+
+```sh
+uv run --frozen --env-file .env mario-eval assisted --episodes 1 --max-decisions 100 --wall-seconds 600
+```
+
+See [Assisted comparison](#assisted-comparison-new) for its budgets and reports.
+
+For the original **direct-control comparison**, run:
+
 ```sh
 uv run --frozen --env-file .env mario-eval --max-decisions 250
 ```
@@ -264,9 +361,10 @@ check those files before treating a run as successful.
 - **Connection error:** allow outbound HTTPS to `api.typesafe.ai` and `api.zoom.us`
   through your firewall or proxy. Keep TLS verification enabled.
 - **Zoom response validation error:** inspect the safe diagnostic in the run
-  summary. The adapter assumes the predicate response format in
-  [docs/zoom-api.md](docs/zoom-api.md); additional API compatibility work may be
-  needed if the live service differs. Do not treat this as a model score.
+  summary and the saved `zoom_question` setting for assisted runs. The adapter
+  expects the selected choice or predicate response described in
+  [docs/zoom-api.md](docs/zoom-api.md); direct control expects predicates.
+  Additional API compatibility work may be needed if the service differs. Do not treat this as a model score.
 - **No display / video device:** run from a desktop session or add `--headless`.
   To capture an offline frame on a headless macOS/Linux environment:
 
