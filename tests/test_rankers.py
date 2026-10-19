@@ -21,7 +21,7 @@ def canonical():
 
 def test_canonical_content_identical_between_envelopes(canonical):
     jev = payload_for("jev", canonical)
-    zoom = payload_for("zoom", canonical)
+    zoom = payload_for("zoom", canonical, zoom_question="predicate")
     assert jev["state"] == json.loads(zoom["input"][0]["content"][0]["text"])
     assert set(jev["questions"]["action"]["criteria"]) == {q["name"] for q in zoom["questions"]}
 
@@ -42,6 +42,7 @@ def test_choice_and_predicate_semantics(canonical):
             ]
         },
         candidates,
+        zoom_question="predicate",
     )
     assert jev.candidate == zoom.candidate == "jump"
     assert jev.semantics != zoom.semantics
@@ -80,7 +81,7 @@ def test_rejects_bad_choice_scores(scores):
 )
 def test_rejects_missing_duplicate_unknown_and_type(answers):
     with pytest.raises(ProviderError):
-        parse_ranking("zoom", {"answers": answers}, ("run", "jump"))
+        parse_ranking("zoom", {"answers": answers}, ("run", "jump"), "predicate")
 
 
 def test_ties_stable_and_search_prefers_survival(canonical, monkeypatch):
@@ -95,7 +96,7 @@ def test_ties_stable_and_search_prefers_survival(canonical, monkeypatch):
             {"name": k, "type": "predicate", "probability": 0.5} for k in canonical["outcomes"]
         ]
     }
-    assert parse_ranking("zoom", tied, tuple(canonical["outcomes"])).candidate == "run"
+    assert parse_ranking("zoom", tied, tuple(canonical["outcomes"]), "predicate").candidate == "run"
 
 
 @pytest.mark.parametrize("provider", ["jev", "zoom"])
@@ -171,3 +172,94 @@ def test_cancellation_kills_worker(monkeypatch):
     with pytest.raises(ProviderError, match="cancelled"):
         bounded_post("zoom", {}, 30, lambda: True)
     assert workers[0].poll() is not None
+
+
+def choice_response():
+    return {
+        "answers": [
+            {
+                "name": "action",
+                "type": "choice",
+                "choice": "jump",
+                "probabilities": [
+                    {"value": "run", "probability": 0.1},
+                    {"value": "jump", "probability": 0.9},
+                ],
+            }
+        ],
+        "model": "zoom-decisions",
+        "request_id": "test-request",
+        "usage": {"input_units": 113, "output_units": 1, "unit_type": "tokens"},
+    }
+
+
+def test_native_choice_envelope_and_roundtrip(canonical, monkeypatch):
+    monkeypatch.setenv("ZOOM_API_KEY", "test-key")
+    expected = choice_response()
+
+    def respond(provider, payload, limit, cancelled):
+        assert provider == "zoom"
+        assert json.loads(payload["input"]) == canonical
+        (question,) = payload["questions"]
+        assert question == {
+            "name": "action",
+            "type": "choice",
+            "instructions": payload_for("jev", canonical)["questions"]["action"]["instructions"],
+            "choices": [{"value": key} for key in canonical["outcomes"]],
+        }
+        return expected
+
+    monkeypatch.setattr("mario_eval.rankers.bounded_post", respond)
+    result = Ranker("zoom").choose(canonical)
+    assert result.candidate == "jump"
+    assert result.scores == {"run": 0.1, "jump": 0.9}
+    assert result.semantics == "categorical_choice"
+    assert result.metadata == {k: expected[k] for k in ("model", "request_id", "usage")}
+    assert result.request["questions"][0]["type"] == "choice"
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "missing",
+        "duplicate",
+        "unknown",
+        "nan",
+        "bool",
+        "range",
+        "wrong_name",
+        "wrong_type",
+        "unknown_choice",
+        "extra_answer",
+    ],
+)
+def test_native_choice_rejects_malformed_answers(fault):
+    response = choice_response()
+    answer = response["answers"][0]
+    if fault == "missing":
+        answer["probabilities"].pop()
+    elif fault == "duplicate":
+        answer["probabilities"].append(answer["probabilities"][0])
+    elif fault == "unknown":
+        answer["probabilities"][0]["value"] = "fly"
+    elif fault in ("nan", "bool", "range"):
+        answer["probabilities"][0]["probability"] = {"nan": math.nan, "bool": True, "range": 1.1}[
+            fault
+        ]
+    elif fault == "wrong_name":
+        answer["name"] = "unrequested"
+    elif fault == "wrong_type":
+        answer["type"] = "score"
+    elif fault == "unknown_choice":
+        answer["choice"] = "fly"
+    else:
+        response["answers"].append(dict(answer))
+    with pytest.raises(ProviderError):
+        parse_ranking("zoom", response, ("run", "jump"))
+
+
+def test_native_choice_preserves_service_tie_selection():
+    response = choice_response()
+    for item in response["answers"][0]["probabilities"]:
+        item["probability"] = 0.5
+    assert parse_ranking("zoom", response, ("run", "jump")).candidate == "jump"

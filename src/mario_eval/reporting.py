@@ -152,7 +152,7 @@ def report(path, rows, track, offline, shared_validation=None):
         "## Interpretation",
         "",
         "- API latency excludes simulation; wall time includes waiting and simulation. Each lane pauses its own game time during both; episode lanes run independently in parallel.",
-        "- Zoom independent predicates and Jev categorical probabilities have different meanings. Raw scores are in the event logs.",
+        "- The request and score semantics are recorded in each ranking event. Choice scores are not calibrated across providers; legacy predicate scores are independent and unnormalized.",
         "- Search and offline fixtures make no API calls. Reported usage is recorded per successful request; monetary cost is unknown.",
         "- No automatic escape or follow-up actions are executed. All assistance is the shared simulated outcome set.",
         "- Small samples are diagnostic, not evidence of statistical superiority. Model responses need not be deterministic.",

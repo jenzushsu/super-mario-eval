@@ -54,6 +54,16 @@ responses can produce faster wall-clock progress, without advancing game time
 while that lane is waiting. The three-attempt smoke benchmark
 is not a statistically conclusive performance study.
 
+### Zoom question format
+
+Assisted mode and identical-state evaluation now use Zoom's native `choice`
+question by default, matching Jev's action-selection task. The response's explicit
+choice is honored and its categorical probabilities are logged. To compare against
+the old independent-predicate setup, add `--zoom-question predicate` to either
+command. The setting is recorded in config.json. Direct control still uses predicates.
+See [Zoom formats](docs/zoom-api.md) for the supplied choice, predicate, score,
+and mixed-question contracts. Native choice gameplay improvement is not yet verified.
+
 ### Budgets and assistance
 
 Seven versioned macros use a 48-frame horizon, up to 72 extra landing frames,
@@ -82,9 +92,9 @@ The terminal immediately prints a unique `artifacts/<run-id>/` directory:
 
 Logs flush incrementally and reports retain partial episodes on cancellation or
 provider failure. Provider usage is preserved when returned. Cost stays **unknown**
-until a provider-specific pricing calculation is implemented. Jev choice scores
-and Zoom independent predicate probabilities must not be compared as calibrated
-confidence. Offline fixtures are never included as live model measurements.
+until a provider-specific pricing calculation is implemented. Neither native-choice
+scores nor legacy independent-predicate scores are calibrated across providers.
+Legacy predicate scores must not be treated as a categorical distribution. Offline fixtures are never included as live model measurements.
 
 ### Compare decisions on identical states
 
@@ -222,7 +232,7 @@ uv run --frozen --env-file .env mario-eval --headless --max-decisions 1
 This makes a live request to each provider and may incur usage charges. A
 successful run prints summaries for both providers with `count: 1` and
 `error: null`, followed by the artifact directory. The Zoom text-only,
-seven-predicate request remains unverified until this succeeds with your key.
+seven-predicate request succeeded in user-supplied runs; verify access with your own key.
 
 ### 5. Open the live side-by-side comparison
 
@@ -279,8 +289,8 @@ check those files before treating a run as successful.
   must not be interpreted as a categorical distribution or compared directly
   with Jev confidence. Jev's extra judgments also affect latency comparability.
 - Zoom receives text JSON, no screenshots, matching Jev's information source.
-  The supplied Zoom examples demonstrate one predicate with text and an image;
-  text-only multi-predicate acceptance still requires live API verification.
+  User-supplied logs demonstrate successful text-only multi-predicate calls.
+  Assisted mode additionally supports native choice; see docs/zoom-api.md.
 - This evaluates the two controller implementations, including their prompts and
   question types, not an isolated causal comparison of the underlying models.
 

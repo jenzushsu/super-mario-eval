@@ -88,7 +88,12 @@ def choose_with_events(lane, canonical, display):
         lane["journal"].emit(
             "request",
             decision_index=lane["decisions"] + 1,
-            body=payload_for(policy, canonical, lane["ranker"].model),
+            body=payload_for(
+                policy,
+                canonical,
+                lane["ranker"].model,
+                getattr(lane["ranker"], "zoom_question", "choice"),
+            ),
         )
     display.update(lane, "Waiting for API" if policy in ("jev", "zoom") else "Ranking")
     ranking = lane["ranker"].choose(canonical, remaining, cancelled=display.refresh)
@@ -131,6 +136,8 @@ def episode_run(args, capture=False):
     )
     # Fail before creating episodes or making paid requests when a required key is absent.
     rankers = {name: Ranker(name, args.timeout, args.model) for name in policies}
+    for ranker in rankers.values():
+        ranker.zoom_question = getattr(args, "zoom_question", "choice")
     track = "corpus_capture" if capture else "episodes"
     root = new_run(
         args.artifacts_dir,
@@ -143,6 +150,7 @@ def episode_run(args, capture=False):
             "episodes": args.episodes,
             "simulation": asdict(config),
             "model_requested": args.model,
+            "zoom_question": getattr(args, "zoom_question", "choice"),
             "limits": {
                 key: getattr(args, key)
                 for key in (
@@ -198,7 +206,11 @@ def episode_run(args, capture=False):
                             + (
                                 "native Choice"
                                 if policy == "jev"
-                                else "independent predicates"
+                                else (
+                                    "native Choice"
+                                    if getattr(args, "zoom_question", "choice") == "choice"
+                                    else "independent predicates"
+                                )
                                 if policy == "zoom"
                                 else "deterministic search"
                             ),
@@ -521,6 +533,8 @@ def evaluate_corpus(args):
         ["fixture-jev", "fixture-zoom", "search"] if args.offline else ["jev", "zoom", "search"]
     )
     rankers = {name: Ranker(name, args.timeout, args.model) for name in policies}
+    for ranker in rankers.values():
+        ranker.zoom_question = getattr(args, "zoom_question", "choice")
     root = new_run(
         args.artifacts_dir,
         {
@@ -532,6 +546,7 @@ def evaluate_corpus(args):
             "env": corpus["env"],
             "seeds": sorted({case["seed"] for case in corpus["cases"]}),
             "model_requested": args.model,
+            "zoom_question": getattr(args, "zoom_question", "choice"),
             "limits": {
                 key: getattr(args, key)
                 for key in (
@@ -648,7 +663,9 @@ def evaluate_corpus(args):
                     if remaining <= 0:
                         raise BudgetStop("wall_time_cap")
                     if policy in ("jev", "zoom"):
-                        request_body = payload_for(policy, canonical, args.model)
+                        request_body = payload_for(
+                            policy, canonical, args.model, getattr(args, "zoom_question", "choice")
+                        )
                         emit(
                             {
                                 "event": "request",
@@ -756,6 +773,12 @@ def main(argv):
     parser.add_argument("--settle", type=int, default=4)
     parser.add_argument("--depth", type=int, choices=(0, 1), default=1)
     parser.add_argument("--model", default="jev-latest")
+    parser.add_argument(
+        "--zoom-question",
+        choices=("choice", "predicate"),
+        default="choice",
+        help="Zoom assisted/evaluate question type (default: native choice)",
+    )
     parser.add_argument("--artifacts-dir", type=Path, default=Path("artifacts"))
     args = parser.parse_args(argv)
     if args.screenshot and (args.headless or args.command != "assisted"):

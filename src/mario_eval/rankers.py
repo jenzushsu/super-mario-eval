@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 
 from .simulation import rank_outcome
 
-PROMPT_VERSION = "outcome-ranker-v1"
+PROMPT_VERSION = "outcome-ranker-v2"
 OBJECTIVE = (
     "Choose the candidate that makes progress toward the flag without dying. "
     "Prefer a completion, then surviving moves with viable continuations. "
@@ -46,7 +46,7 @@ class Ranking:
     request: dict | None = None
 
 
-def payload_for(provider, canonical, model="jev-latest"):
+def payload_for(provider, canonical, model="jev-latest", zoom_question="choice"):
     if provider == "jev":
         return {
             "model": model,
@@ -63,6 +63,20 @@ def payload_for(provider, canonical, model="jev-latest"):
             },
         }
     if provider == "zoom":
+        if zoom_question == "choice":
+            return {
+                "input": json.dumps(canonical, sort_keys=True, allow_nan=False),
+                "questions": [
+                    {
+                        "name": "action",
+                        "type": "choice",
+                        "instructions": OBJECTIVE,
+                        "choices": [{"value": key} for key in canonical["outcomes"]],
+                    }
+                ],
+            }
+        if zoom_question != "predicate":
+            raise ValueError("Unsupported Zoom question type")
         return {
             "input": [
                 {
@@ -103,11 +117,33 @@ def validate_scores(scores, candidates):
     return dict(scores)
 
 
-def parse_ranking(provider, data, candidates):
+def parse_ranking(provider, data, candidates, zoom_question="choice"):
     try:
         if not isinstance(data, dict) or not candidates:
             raise ProviderError("schema", "Invalid ranking response or empty candidate set")
-        if provider == "zoom":
+        if provider == "zoom" and zoom_question == "choice":
+            answers = data["answers"]
+            if not isinstance(answers, list) or len(answers) != 1:
+                raise ProviderError("schema", "Expected exactly one Zoom action answer")
+            answer = answers[0]
+            if answer["name"] != "action" or answer["type"] != "choice":
+                raise ProviderError("schema", "Expected Zoom action choice answer")
+            probabilities = answer["probabilities"]
+            if not isinstance(probabilities, list):
+                raise ProviderError("schema", "Expected a list of choice probabilities")
+            scores = {}
+            for entry in probabilities:
+                value = entry["value"]
+                if not isinstance(value, str) or value in scores:
+                    raise ProviderError("schema", "Duplicate or invalid choice value")
+                scores[value] = entry["probability"]
+            scores = validate_scores(scores, candidates)
+            choice = answer["choice"]
+            if not isinstance(choice, str) or choice not in candidates:
+                raise ProviderError("schema", "Provider selected an unknown candidate")
+            # Honor the explicit service selection, including its tie-breaking.
+            semantics = "categorical_choice"
+        elif provider == "zoom" and zoom_question == "predicate":
             scores = {}
             for answer in data["answers"]:
                 name = answer["name"]
@@ -119,13 +155,15 @@ def parse_ranking(provider, data, candidates):
             scores = validate_scores(scores, candidates)
             choice = max(candidates, key=lambda key: scores[key])
             semantics = "independent_predicates"
-        else:
+        elif provider == "jev":
             answer = data["answers"]["action"]
             choice = answer["choice"]
             scores = validate_scores(answer["probabilities"], candidates)
             if choice not in candidates:
                 raise ProviderError("schema", "Provider selected an unknown candidate")
             semantics = "categorical_choice"
+        else:
+            raise ProviderError("schema", "Unsupported ranking response mode")
         metadata = {key: data.get(key) for key in ("model", "request_id", "usage")}
         return Ranking(choice, scores, semantics, metadata=metadata)
     except (KeyError, TypeError, AttributeError):
@@ -135,8 +173,9 @@ def parse_ranking(provider, data, candidates):
 
 
 class Ranker:
-    def __init__(self, provider, timeout=30.0, model="jev-latest"):
+    def __init__(self, provider, timeout=30.0, model="jev-latest", zoom_question="choice"):
         self.provider, self.timeout, self.model = provider, timeout, model
+        self.zoom_question = zoom_question
         if provider not in (*URLS, "search", "fixture-jev", "fixture-zoom"):
             raise ValueError("Unknown ranker")
         if provider in KEYS and not os.environ.get(KEYS[provider]):
@@ -154,11 +193,11 @@ class Ranker:
                 {},
                 "deterministic_search" if self.provider == "search" else "offline_fixture",
             )
-        payload = payload_for(self.provider, canonical, self.model)
+        payload = payload_for(self.provider, canonical, self.model, self.zoom_question)
         started = time.perf_counter()
         limit = min(self.timeout, timeout) if timeout is not None else self.timeout
         data = bounded_post(self.provider, payload, limit, cancelled)
-        ranking = parse_ranking(self.provider, data, candidates)
+        ranking = parse_ranking(self.provider, data, candidates, self.zoom_question)
         ranking.latency_ms = (time.perf_counter() - started) * 1000
         ranking.request = payload
         return ranking
