@@ -10,7 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 from uuid import uuid4
 
-from typesafe_mario.actions import ACTION_TO_INDEX, Action
+from typesafe_mario.actions import ACTION_TO_INDEX, JUMP_RELEASE_ACTION, Action
 from typesafe_mario.policy import HeuristicPolicy, TypeSafePolicy
 from typesafe_mario.runner import _unwrap_ram, create_mario_env
 from typesafe_mario.state import MarioStateParser
@@ -64,6 +64,13 @@ class View:
 
     def close(self):
         self.pg.quit()
+
+
+def controller_action(action, snapshot, frame_index):
+    # Match the upstream dashboard: a grounded jump needs a button-up edge.
+    if frame_index == 0 and snapshot.grounded and action in JUMP_RELEASE_ACTION:
+        return JUMP_RELEASE_ACTION[action]
+    return action
 
 
 def positive(value):
@@ -126,6 +133,9 @@ def run(args):
             }
             lanes.append(lane)
             lane["frame"], lane["info"] = env.reset(seed=args.seed)
+            lane["snapshot"] = lane["parser"].parse(lane["info"], _unwrap_ram(env))
+            lane["best_x"] = int(lane["info"].get("x_pos", 0))
+            lane["frames"] = 0
             if args.offline:
                 lane["name"] += " [OFFLINE]"
                 lane["method"] = "Heuristic smoke test · no model calls"
@@ -139,14 +149,7 @@ def run(args):
                 for lane in lanes:
                     if lane["done"]:
                         continue
-                    snapshot = lane["parser"].parse(
-                        lane["info"],
-                        _unwrap_ram(lane["env"]),
-                        previous_action=lane["action"],
-                        previous_reward=lane["last_reward"],
-                        previous_latency_ms=lane["latency"],
-                        previous_response_delay_frames=0,
-                    )
+                    snapshot = lane["snapshot"]
                     lane["status"] = "Choosing"
                     pending.append(
                         (
@@ -187,15 +190,28 @@ def run(args):
                     lane["latencies"].append(decision.latency_ms)
                     lane["last_reward"] = 0.0
                     lane["decision"] = decision
-                    lane["snapshot"] = snapshot
+                    lane["executed_actions"] = []
                     lane["status"] = "Running"
                 # Render each emulator frame; neither provider gains simulated time during inference.
                 for _frame in range(args.frames_per_decision):
                     for lane, _, _ in pending:
                         if lane["done"]:
                             continue
+                        applied = controller_action(
+                            Action(lane["action"]), lane["snapshot"], _frame
+                        )
                         frame, reward, terminated, truncated, info = lane["env"].step(
-                            ACTION_TO_INDEX[Action(lane["action"])]
+                            ACTION_TO_INDEX[applied]
+                        )
+                        lane["executed_actions"].append(applied.value)
+                        lane["frames"] += 1
+                        lane["snapshot"] = lane["parser"].parse(
+                            info,
+                            _unwrap_ram(lane["env"]),
+                            previous_action=applied.value,
+                            previous_reward=float(reward),
+                            previous_latency_ms=lane["latency"],
+                            previous_response_delay_frames=0,
                         )
                         lane.update(frame=frame, info=info)
                         lane["last_reward"] += float(reward)
@@ -205,7 +221,15 @@ def run(args):
                         lane["dead"] = bool(info.get("death", False))
                         lane["done"] = terminated or truncated or lane["clear"] or lane["dead"]
                         if lane["done"]:
-                            lane["status"] = "Cleared" if lane["clear"] else "Episode ended"
+                            lane["status"] = (
+                                "Cleared"
+                                if lane["clear"]
+                                else "Died"
+                                if lane["dead"]
+                                else "Truncated"
+                                if truncated
+                                else "Episode ended"
+                            )
                     if view:
                         if not view.draw(lanes, "Running"):
                             cancelled = True
@@ -218,6 +242,9 @@ def run(args):
                     record = {
                         "decision_index": lane["count"],
                         "state": snapshot.to_state(),
+                        "state_after": lane["snapshot"].to_state(),
+                        "executed_actions": lane["executed_actions"],
+                        "emulator_frames": lane["frames"],
                         "decision": asdict(lane["decision"]),
                         "reward": lane["last_reward"],
                         "total_reward": lane["reward"],
@@ -248,6 +275,8 @@ def run(args):
                 for key in ("name", "status", "count", "best_x", "reward", "clear", "dead")
             }
             | {
+                "emulator_frames": lane["frames"],
+                "simulated_seconds": lane["frames"] / 60,
                 "mean_latency_ms": statistics.mean(lane["latencies"])
                 if lane["latencies"]
                 else None,

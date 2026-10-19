@@ -18,6 +18,7 @@ def test_provider_failure_is_logged_while_other_lane_continues(tmp_path, monkeyp
 
     class Snapshot:
         stalled_steps = 0
+        grounded = True
 
         def to_state(self):
             return {"player": {"x": 40}}
@@ -56,4 +57,20 @@ def test_provider_failure_is_logged_while_other_lane_continues(tmp_path, monkeyp
     assert summary[1]["count"] == 2
     failure = json.loads((run_dir / "jev.jsonl").read_text())
     assert failure["event"] == "provider_error"
-    assert len((run_dir / "zoom.jsonl").read_text().splitlines()) == 2
+    records = [json.loads(line) for line in (run_dir / "zoom.jsonl").read_text().splitlines()]
+    assert len(records) == 2
+    assert records[-1]["emulator_frames"] == 16
+    assert len(records[-1]["executed_actions"]) == 8
+    assert "state_after" in records[-1]
+    assert summary[1]["simulated_seconds"] == 16 / 60
+
+
+def test_grounded_jump_releases_once_and_preserves_airborne_hold():
+    from typesafe_mario.actions import Action
+
+    grounded = SimpleNamespace(grounded=True)
+    airborne = SimpleNamespace(grounded=False)
+    assert cli.controller_action(Action.RIGHT_RUN_JUMP, grounded, 0) == Action.RIGHT_RUN
+    assert cli.controller_action(Action.RIGHT_RUN_JUMP, grounded, 1) == Action.RIGHT_RUN_JUMP
+    assert cli.controller_action(Action.RIGHT_RUN_JUMP, airborne, 0) == Action.RIGHT_RUN_JUMP
+    assert cli.controller_action(Action.RIGHT, grounded, 0) == Action.RIGHT
