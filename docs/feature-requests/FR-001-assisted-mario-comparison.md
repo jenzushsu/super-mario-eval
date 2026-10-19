@@ -1,6 +1,7 @@
 # FR-001: Compare Jev and Zoom Decisions using simulated Mario outcomes
 
-Status: Proposed — not implemented  
+Status: Implemented; offline validation passed; live integration blocked by HTTP 403
+
 Priority: High  
 Project: `jenzushsu/super-mario-eval`
 
@@ -160,27 +161,27 @@ reuse terms before copying code because the reviewed checkout has no LICENSE fil
 
 ## Acceptance criteria
 
-- [ ] A repeated snapshot rollout matches RAM, images, wrapper counters, and terminal
+- [x] A repeated snapshot rollout matches RAM, images, wrapper counters, and terminal
   state; exploring candidates in a different order does not change their outcomes.
-- [ ] Executing a selected candidate reproduces its simulated outcome for identical
+- [x] Executing a selected candidate reproduces its simulated outcome for identical
   initial state and horizon, including grounded jumps, landings, and terminal cases.
-- [ ] Identical-state runs deliver matching state/outcome content and candidate IDs
+- [x] Identical-state runs deliver matching state/outcome content and candidate IDs
   to both adapters; request-envelope differences are explicit and tested.
-- [ ] Search-only and fixture-backed offline runs require no keys and cannot call
+- [x] Search-only and fixture-backed offline runs require no keys and cannot call
   either provider. They are visibly labeled and excluded from live model results.
-- [ ] Adapter tests cover successful parsing, stable ties, unknown/missing/duplicate
+- [x] Adapter tests cover successful parsing, stable ties, unknown/missing/duplicate
   candidates, invalid scores, authentication errors, timeouts, and malformed JSON.
 - [ ] At least one successful bounded live request from each provider is recorded
   before live integration is marked verified; missing access remains a blocker.
-- [ ] A bounded three-attempt World 1-1 run produces one combined report with each
+- [x] A bounded three-attempt World 1-1 run produces one combined report with each
   policy's outcomes, counts, latency, budgets, and available usage, including failures.
-- [ ] A simulated wait, an actual stall, a death, a cap, and a provider failure are
+- [x] A simulated wait, an actual stall, a death, a cap, and a provider failure are
   distinguishable in both the desktop view and saved report.
-- [ ] Replay makes zero provider calls and detects a deliberately altered checkpoint
+- [x] Replay makes zero provider calls and detects a deliberately altered checkpoint
   or action sequence; summaries remain available after interruption.
-- [ ] Direct and assisted mode results remain explicitly separate. No completion
+- [x] Direct and assisted mode results remain explicitly separate. No completion
   threshold is imposed that would encourage hiding valid model failures.
-- [ ] Local setup and evaluation commands work as documented; secrets stay ignored.
+- [x] Local setup and evaluation commands work as documented; secrets stay ignored.
 
 ## Dependencies and unresolved items
 
@@ -190,3 +191,18 @@ reuse terms before copying code because the reviewed checkout has no LICENSE fil
 - Emulator snapshot compatibility and measured search cost on the supported runtime.
 - Verified provider pricing if monetary comparisons are requested.
 - Upstream permission/license clarification only if implementation code is copied.
+
+## Implementation notes
+
+Implemented as `mario-eval assisted`, `capture`, `evaluate`, and `replay` while
+retaining the original direct-control command. The simulator is original code on
+the existing Python 3.13 stack. Initial macros use a 48-frame horizon, bounded
+landing/settling, and optionally three single-step continuations. No automatic
+escape or follow-up execution is implemented.
+
+Offline fixtures and the search-only baseline passed a bounded three-attempt
+World 1-1 smoke run. This is not a measured live comparison. Both configured
+services returned HTTP 403 during the one-request-per-service live smoke test;
+provider access must succeed before live integration can be called verified.
+Corpus coverage depends on the captured trajectory and is explicitly reported;
+a short capture does not imply coverage of every required scene.

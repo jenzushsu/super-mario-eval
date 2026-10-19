@@ -29,7 +29,12 @@ Mario adaptation: serialize the shared state as input_text, set
 Choose the largest raw probability. Reject missing, duplicate, incorrectly typed,
 nonfinite, or out-of-range action scores. Do not normalize or synthesize confidence.
 
-Still unverified without a real key: text-only requests, seven predicates in a
+Still unverified after the configured cloud key returned HTTP 403: text-only requests, seven predicates in a
 single call, service limits and authenticated responses in this cloud environment.
 A native choice sample, if provided later, could replace predicate ranking and
 make action-selection semantics closer to Jev's Choice.
+
+The assisted adapter in `rankers.py` uses the same endpoint and predicate contract,
+but asks the service to rank common simulated outcomes rather than raw controller
+macros. Requests execute in a separate process with a total deadline and no retries.
+Only sanitized request bodies and locally generated error descriptions are logged.

@@ -5,6 +5,135 @@ Uses [fhshaik/typesafe-mario](https://github.com/fhshaik/typesafe-mario) at comm
 `ca22449ed187118d19326d1f54b01b6636578aa4` for the emulator, state parser, actions,
 and unmodified Jev policy. Upstream source is installed as a dependency, not copied.
 
+
+## Assisted comparison (new)
+
+The new `assisted` mode follows the experiment design of
+[4esv/jev-mario](https://github.com/4esv/jev-mario): simulate possible moves, then
+ask the services to rank measured outcomes. The implementation is original and
+uses our existing Python 3.13 emulator stack. It includes a deterministic
+search-only baseline, no automatic escape moves, and no unselected follow-ups.
+The original commands below still run **direct control**, a separate benchmark.
+
+After local setup and `.env` configuration below, try a short offline run:
+
+```sh
+uv run --frozen mario-eval assisted --offline --episodes 1 --max-decisions 3
+```
+
+Both displayed policies are explicitly labeled **OFFLINE FIXTURE** and use the
+same deterministic ranker; they are not simulated model responses. The third,
+search-only baseline appears in the report. The window distinguishes simulation,
+API wait, execution, stall, death, and budget limits. Q/Escape stops the run;
+an in-flight request worker is terminated on cancellation.
+
+Validate live access with one call per service before spending more:
+
+```sh
+uv run --frozen --env-file .env mario-eval assisted --headless \
+  --episodes 1 --max-decisions 1 --timeout 15
+```
+
+Then run a bounded three-attempt comparison:
+
+```sh
+uv run --frozen --env-file .env mario-eval assisted --episodes 3 --max-decisions 25
+```
+
+For Windows PowerShell, put each multi-line example on **one line** (the `\`
+continuation above is for macOS/Linux shells).
+
+Every attempt uses matching level and seed across Jev, Zoom, and search. Episodes
+are independent, so states diverge after different choices. Lookahead supplies
+assistance: completion is not evidence of unaided gameplay. Execution pauses
+during simulation and API calls. Requests are scheduled sequentially across
+policies; API latency excludes simulation, and per-policy active wall time
+excludes time spent running the other policies. The three-attempt smoke benchmark
+is not a statistically conclusive performance study.
+
+### Budgets and assistance
+
+Seven versioned macros use a 48-frame horizon, up to 72 extra landing frames,
+and four neutral settling frames. `--depth 1` (default) evaluates three single-move
+continuations per surviving candidate. Only the selected candidate is executed;
+continuations provide evidence, not automatic actions. `--depth 0` is faster but
+changes the experiment. Airborne or truncated outcomes are recorded as unknown,
+not silently classified as fatal or safe.
+
+Defaults per policy/episode: `--max-decisions 25`, `--game-frames 3600`,
+`--simulation-frames 200000`, `--wall-seconds 180`, `--stall-frames 360`, and
+`--timeout 30`. Simulation frames and actual game frames have separate caps.
+A stall means no new best position within the configured actual frame interval.
+Simulation can take much longer than the resulting gameplay; its status is visible.
+
+### Read the report
+
+The terminal immediately prints a unique `artifacts/<run-id>/` directory:
+
+| File | Purpose |
+| --- | --- |
+| `report.md` | Readable aggregate and per-attempt comparison; open in your editor |
+| `summary.json` | Machine-readable outcomes, progress, frames, latency, budgets, and failures |
+| `config.json` | Code/dependency versions, dirty-tree status, model request, seeds, simulation settings |
+| `<policy>-<attempt>.jsonl` | Canonical evidence, request bodies without headers, raw scores, actual controls, before/after fingerprints, errors |
+
+Logs flush incrementally and reports retain partial episodes on cancellation or
+provider failure. Provider usage is preserved when returned. Cost stays **unknown**
+until a provider-specific pricing calculation is implemented. Jev choice scores
+and Zoom independent predicate probabilities must not be compared as calibrated
+confidence. Offline fixtures are never included as live model measurements.
+
+### Compare decisions on identical states
+
+Capture a bounded search trajectory without keys, then evaluate the frozen
+checkpoints with both services and the deterministic baseline:
+
+```sh
+uv run --frozen mario-eval capture --episodes 1 --max-decisions 12 --headless
+uv run --frozen --env-file .env mario-eval evaluate artifacts/<capture-run-id>/corpus.json --max-decisions 12
+```
+
+Replace `<capture-run-id>` with the printed directory. Add `--offline` to the
+`evaluate` command for a zero-API fixture check. The corpus records replayable
+action prefixes and geometry tags, includes an airborne sample when encountered,
+and lists missing scene coverage. A short trajectory is not a balanced benchmark;
+inspect `coverage` and `missing_coverage` before drawing conclusions.
+
+Evaluation first replays and re-simulates each checkpoint, rejecting changed
+fingerprints or outcomes before scoring that case. Results include `rankings.jsonl`,
+`agreement.json`, known-fatal selections when a survivor existed, and per-case
+chosen progress. These are finite-horizon diagnostics, not an optimality claim.
+A failed case revalidation stops evaluation; already written results remain.
+Evaluation wall-time and simulation budgets span the entire evaluation, including
+checkpoint reconstruction. `--game-frames` caps each action prefix, and
+`--max-decisions` caps cases and therefore calls per provider. The exact corpus
+and its SHA-256 hash are saved with the evaluation. Each request has a total
+deadline enforced by a separate worker process; latency includes worker startup.
+
+### Verify replay without API calls
+
+```sh
+uv run --frozen mario-eval replay artifacts/<run-id>/jev-001.jsonl
+```
+
+Use `fixture-jev-001.jsonl` for an offline run. Replay re-executes the actual recorded
+buttons and verifies state fingerprints, including partial executions and the end
+state. This is headless verification, not video playback or fresh inference.
+It requires matching dependency versions and assisted artifact schemas. Old
+direct-control logs are rejected with an explicit message. Checkpoints store
+JSON action prefixes rather than opaque executable serialization or ROM data.
+
+A cloud screenshot can be captured using SDL's dummy display:
+
+```sh
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy uv run --frozen mario-eval assisted \
+  --offline --episodes 1 --max-decisions 1 --depth 0 --exit-when-done \
+  --screenshot artifacts/assisted-comparison.png
+```
+
+See [FR-001](docs/feature-requests/FR-001-assisted-mario-comparison.md) and the
+[reference evaluation](docs/reference-evaluation.md) for scope and rationale.
+
 ## Run locally
 
 ### 1. Install prerequisites and clone
@@ -133,7 +262,7 @@ check those files before treating a run as successful.
     --offline --max-decisions 10 --exit-when-done --screenshot artifacts/comparison.png
   ```
 
-## Comparison methodology
+## Direct-control comparison methodology
 
 - Same level, seed (123), seven legal actions, parser, and eight emulator frames per action.
 - Two independent episodes; states diverge after the models choose different actions.

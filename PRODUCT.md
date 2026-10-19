@@ -5,3 +5,8 @@ Zoom Decisions controlling Mario. Users need to see both gameplay trajectories
 and inspect reproducible logs. Live results must be distinct from offline smoke
 tests. The user supplied Zoom request/response examples; no official documentation
 was provided. The upstream Python controller is the shared baseline.
+
+Assisted mode adds shared finite-horizon outcome simulation, two live provider
+rankers, and a search-only baseline. Separate identical-state and episode reports
+explain progress, errors, and simulation assistance. Native checkpoint restoration
+and JSON action replay support reproducibility. Direct mode remains distinct.

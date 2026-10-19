@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import statistics
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
@@ -303,6 +304,10 @@ def run(args):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in {"assisted", "capture", "evaluate", "replay"}:
+        from .assisted import main as assisted_main
+
+        return assisted_main(sys.argv[1:])
     parser = argparse.ArgumentParser(description="Compare Jev and Zoom in paired Mario episodes")
     parser.add_argument("--env", default="SuperMarioBros-1-1-v0")
     parser.add_argument("--seed", type=int, default=123)
