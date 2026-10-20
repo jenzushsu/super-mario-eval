@@ -95,6 +95,7 @@ def choose_with_events(lane, canonical, display):
                 canonical,
                 lane["ranker"].model,
                 getattr(lane["ranker"], "zoom_question", "choice"),
+                getattr(lane["ranker"], "zoom_model", "zoom-decisions"),
             ),
         )
     display.update(lane, "Waiting for API" if policy in ("jev", "zoom") else "Ranking")
@@ -145,6 +146,7 @@ def episode_run(args, capture=False):
     rankers = {name: Ranker(name, args.timeout, args.model) for name in policies}
     for ranker in rankers.values():
         ranker.zoom_question = getattr(args, "zoom_question", "choice")
+        ranker.zoom_model = getattr(args, "zoom_model", "zoom-decisions")
     track = "corpus_capture" if capture else "episodes"
     root = new_run(
         args.artifacts_dir,
@@ -157,6 +159,7 @@ def episode_run(args, capture=False):
             "episodes": args.episodes,
             "simulation": asdict(config),
             "model_requested": args.model,
+            "zoom_model_requested": getattr(args, "zoom_model", "zoom-decisions"),
             "zoom_question": getattr(args, "zoom_question", "choice"),
             "limits": {
                 key: getattr(args, key)
@@ -616,6 +619,7 @@ def evaluate_corpus(args):
     rankers = {name: Ranker(name, args.timeout, args.model) for name in policies}
     for ranker in rankers.values():
         ranker.zoom_question = getattr(args, "zoom_question", "choice")
+        ranker.zoom_model = getattr(args, "zoom_model", "zoom-decisions")
     root = new_run(
         args.artifacts_dir,
         {
@@ -627,6 +631,7 @@ def evaluate_corpus(args):
             "env": corpus["env"],
             "seeds": sorted({case["seed"] for case in corpus["cases"]}),
             "model_requested": args.model,
+            "zoom_model_requested": getattr(args, "zoom_model", "zoom-decisions"),
             "zoom_question": getattr(args, "zoom_question", "choice"),
             "limits": {
                 key: getattr(args, key)
@@ -743,7 +748,11 @@ def evaluate_corpus(args):
                         raise BudgetStop("wall_time_cap")
                     if policy in ("jev", "zoom"):
                         request_body = payload_for(
-                            policy, canonical, args.model, getattr(args, "zoom_question", "choice")
+                            policy,
+                            canonical,
+                            args.model,
+                            getattr(args, "zoom_question", "choice"),
+                            getattr(args, "zoom_model", "zoom-decisions"),
                         )
                         emit(
                             {
@@ -859,7 +868,7 @@ def main(argv):
     parser.add_argument(
         "--model",
         default="jev-latest",
-        help="Jev model selector only; Zoom uses its service-selected model",
+        help="Jev model selector only; use --zoom-model for Zoom",
     )
     parser.add_argument(
         "--survival-guard",
@@ -871,6 +880,12 @@ def main(argv):
         choices=("choice", "predicate"),
         default="choice",
         help="Zoom assisted/realtime/evaluate question type (default: native choice)",
+    )
+    parser.add_argument(
+        "--zoom-model",
+        choices=("zoom-decisions", "zoom-decisions-pro"),
+        default="zoom-decisions",
+        help="Zoom model to compare against Jev",
     )
     parser.add_argument("--artifacts-dir", type=Path, default=Path("artifacts"))
     args = parser.parse_args(argv)

@@ -53,7 +53,14 @@ def run(args):
         ["fixture-jev", "fixture-zoom", "search"] if args.offline else ["jev", "zoom", "search"]
     )
     rankers = {
-        name: Ranker(name, args.timeout, args.model, args.zoom_question) for name in policies
+        name: Ranker(
+            name,
+            args.timeout,
+            args.model,
+            args.zoom_question,
+            getattr(args, "zoom_model", "zoom-decisions"),
+        )
+        for name in policies
     }
     root = new_run(
         args.artifacts_dir,
@@ -67,6 +74,7 @@ def run(args):
             "simulation": asdict(config),
             "zoom_question": args.zoom_question,
             "model_requested": args.model,
+            "zoom_model_requested": getattr(args, "zoom_model", "zoom-decisions"),
             "scheduling": "independent live and planning workers",
             "controller": "held-move-v1",
             "bootstrap": "neutral until first reply; emulator keeps running",
@@ -203,7 +211,11 @@ def run(args):
                                     decision_index=index,
                                     observed_frame=observed_frame,
                                     body=payload_for(
-                                        lane["policy"], canonical, args.model, args.zoom_question
+                                        lane["policy"],
+                                        canonical,
+                                        args.model,
+                                        args.zoom_question,
+                                        getattr(args, "zoom_model", "zoom-decisions"),
                                     ),
                                 )
                             ranking = ranker.choose(

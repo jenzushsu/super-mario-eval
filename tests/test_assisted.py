@@ -261,3 +261,51 @@ def test_survival_guard_rejects_unsupported_tracks(command):
     with pytest.raises(SystemExit) as error:
         assisted.main([command, "--survival-guard"])
     assert error.value.code == 2
+
+
+def test_selected_zoom_model_reaches_transport_and_journal(tmp_path, monkeypatch):
+    monkeypatch.setenv("ZOOM_ACCESS_TOKEN", "fixture-token")
+    monkeypatch.setenv("TYPESAFE_API_KEY", "fixture-key")
+    seen = {}
+
+    def respond(provider, payload, timeout, cancelled):
+        seen[provider] = payload
+        if provider == "zoom":
+            choices = payload["questions"][0]["choices"]
+            return {
+                "model": payload["model"],
+                "answers": [
+                    {
+                        "type": "choice",
+                        "name": "action",
+                        "choice": "run",
+                        "probabilities": [
+                            {"value": c["value"], "probability": float(c["value"] == "run")}
+                            for c in choices
+                        ],
+                    }
+                ],
+            }
+        choices = payload["questions"]["action"]["criteria"]
+        return {
+            "model": "jev-test",
+            "answers": {
+                "action": {
+                    "choice": "run",
+                    "probabilities": {name: float(name == "run") for name in choices},
+                }
+            },
+        }
+
+    monkeypatch.setattr("mario_eval.rankers.bounded_post", respond)
+    assert (
+        assisted.episode_run(options(tmp_path, offline=False, zoom_model="zoom-decisions-pro")) == 0
+    )
+    root = next(tmp_path.iterdir())
+    config = json.loads((root / "config.json").read_text())
+    assert config["comparison_parameters"]["model_selection"]["zoom"] == "zoom-decisions-pro"
+    assert seen["zoom"]["model"] == "zoom-decisions-pro"
+    assert seen["jev"]["model"] == "jev-latest"
+    events = [json.loads(line) for line in (root / "zoom-001.jsonl").read_text().splitlines()]
+    request = next(event for event in events if event["event"] == "request")
+    assert request["body"] == seen["zoom"]

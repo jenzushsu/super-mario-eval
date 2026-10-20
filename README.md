@@ -209,6 +209,47 @@ command. The setting is recorded in config.json. Direct control still uses predi
 See [Zoom formats](docs/zoom-api.md) for the supplied choice, predicate, score,
 and mixed-question contracts. Native choice gameplay improvement is not yet verified.
 
+### Choose the Zoom model to compare against Jev
+
+For `assisted`, `realtime`, and `evaluate`, use `--zoom-model`. Jev keeps its
+`jev-latest` default; leave `--model` unset. Both services use native choice by default.
+
+In your local `.env`, set `TYPESAFE_API_KEY` and `ZOOM_ACCESS_TOKEN`. The documented
+Zoom API requires a bearer access token with `aiservices:write:decide:admin` and a
+Zoom AI Services or Universal SDK entitlement. Pro may need an additional entitlement.
+Never commit tokens. Obtain/refresh the access token through your Zoom OAuth setup;
+this runner does not refresh expired tokens. If `ZOOM_ACCESS_TOKEN` is absent, the
+runner retains the earlier `ZOOM_API_KEY` / `x-api-key` path for legacy deployments;
+that path is not the authentication documented in the released reference.
+
+```sh
+# Standard Decisions versus Jev
+uv run --frozen --env-file .env mario-eval assisted --zoom-model zoom-decisions --episodes 5 --max-decisions 100 --wall-seconds 600 --simulation-frames 400000 --survival-guard
+
+# Decisions Pro versus Jev, with the same settings
+uv run --frozen --env-file .env mario-eval assisted --zoom-model zoom-decisions-pro --episodes 5 --max-decisions 100 --wall-seconds 600 --simulation-frames 400000 --survival-guard
+```
+
+If using an activated Python virtual environment without uv, load the variables
+into your shell and replace `uv run --frozen --env-file .env mario-eval` with
+`mario-eval`. The CLI itself does not load `.env`.
+
+Each command runs Jev, the selected Zoom model, and the search baseline. These are
+assisted runs; guard interventions are logged. To measure unguarded model choices,
+omit `--survival-guard` in **both** commands. For identical input states, first capture
+one corpus, then use that same path in both evaluations:
+
+```sh
+uv run --frozen mario-eval capture --max-decisions 12 --headless
+uv run --frozen --env-file .env mario-eval evaluate artifacts/<capture-run-id>/corpus.json --zoom-model zoom-decisions --max-decisions 12 --wall-seconds 600
+uv run --frozen --env-file .env mario-eval evaluate artifacts/<capture-run-id>/corpus.json --zoom-model zoom-decisions-pro --max-decisions 12 --wall-seconds 600
+```
+
+The requested Zoom model is saved in `config.json` and each request; returned model,
+usage and latency are in the ranking logs. A missing/different returned model causes
+`model_mismatch`, never silent fallback. Model IDs are public aliases, not immutable
+weight versions. Real-time comparisons also measure latency's effect on gameplay.
+
 ### Matching provider parameters
 
 Native choice (`--zoom-question choice`, the default) uses one shared objective,
@@ -224,7 +265,7 @@ Real-time mode also permits different decision ages because service latency diff
 | --- | --- | --- |
 | Default question | Native choice | Native choice |
 | Objective and action descriptions | Shared | Shared |
-| Model selection | `--model` (default `jev-latest`) | Service-selected; no model selector in the supplied contract |
+| Model selection | `--model` (default `jev-latest`) | `--zoom-model` (default `zoom-decisions`; alternative `zoom-decisions-pro`) |
 | Temperature, top-p, inference seed, output limit | Not sent; effective defaults unknown | Not sent; effective defaults unknown |
 
 **Equal internal model settings cannot be verified from these API contracts.**

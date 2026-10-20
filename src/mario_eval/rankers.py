@@ -38,6 +38,8 @@ URLS = {
     "jev": "https://api.typesafe.ai/v1/systemone",
     "zoom": "https://api.zoom.us/v2/aiservices/decisions/decide",
 }
+ZOOM_MODELS = ("zoom-decisions", "zoom-decisions-pro")
+
 KEYS = {"jev": "TYPESAFE_API_KEY", "zoom": "ZOOM_API_KEY"}
 
 
@@ -60,7 +62,11 @@ class Ranking:
     request_contract_sha256: str | None = None
 
 
-def payload_for(provider, canonical, model="jev-latest", zoom_question="choice"):
+def payload_for(
+    provider, canonical, model="jev-latest", zoom_question="choice", zoom_model="zoom-decisions"
+):
+    if zoom_model not in ZOOM_MODELS:
+        raise ValueError("Unsupported Zoom model")
     # Construct candidate evidence once so native-choice adapters cannot drift.
     descriptions = {
         key: json.dumps(value, sort_keys=True, allow_nan=False)
@@ -81,6 +87,7 @@ def payload_for(provider, canonical, model="jev-latest", zoom_question="choice")
     if provider == "zoom":
         if zoom_question == "choice":
             return {
+                "model": zoom_model,
                 "input": json.dumps(canonical, sort_keys=True, allow_nan=False),
                 "questions": [
                     {
@@ -97,6 +104,7 @@ def payload_for(provider, canonical, model="jev-latest", zoom_question="choice")
         if zoom_question != "predicate":
             raise ValueError("Unsupported Zoom question type")
         return {
+            "model": zoom_model,
             "input": [
                 {
                     "role": "user",
@@ -166,7 +174,7 @@ def comparison_parameters(config):
         "objective_sha256": hashlib.sha256(OBJECTIVE.encode()).hexdigest(),
         "model_selection": {
             "jev": config.get("model_requested", "jev-latest"),
-            "zoom": "service default; no model selector in the supplied contract",
+            "zoom": config.get("zoom_model_requested", "zoom-decisions"),
         },
         "decoding_parameters_sent": {"jev": {}, "zoom": {}},
         "service_decoding_equivalence_verified": False,
@@ -258,14 +266,28 @@ def parse_ranking(provider, data, candidates, zoom_question="choice"):
 
 
 class Ranker:
-    def __init__(self, provider, timeout=30.0, model="jev-latest", zoom_question="choice"):
+    def __init__(
+        self,
+        provider,
+        timeout=30.0,
+        model="jev-latest",
+        zoom_question="choice",
+        zoom_model="zoom-decisions",
+    ):
         self.provider, self.timeout, self.model = provider, timeout, model
         self.zoom_question = zoom_question
+        if zoom_model not in ZOOM_MODELS:
+            raise ValueError("Unsupported Zoom model")
+        self.zoom_model = zoom_model
         if provider not in (*URLS, "search", "fixture-jev", "fixture-zoom"):
             raise ValueError("Unknown ranker")
-        if provider in KEYS and not os.environ.get(KEYS[provider]):
+        if provider in KEYS and not (
+            os.environ.get(KEYS[provider])
+            or (provider == "zoom" and os.environ.get("ZOOM_ACCESS_TOKEN"))
+        ):
             raise ProviderError(
-                "authentication", f"Configure {KEYS[provider]} before live evaluation"
+                "authentication",
+                f"Configure {'ZOOM_ACCESS_TOKEN (or legacy ZOOM_API_KEY)' if provider == 'zoom' else KEYS[provider]} before live evaluation",
             )
 
     def choose(self, canonical, timeout=None, cancelled=lambda: False):
@@ -278,24 +300,35 @@ class Ranker:
                 {},
                 "deterministic_search" if self.provider == "search" else "offline_fixture",
             )
-        payload = payload_for(self.provider, canonical, self.model, self.zoom_question)
+        payload = payload_for(
+            self.provider, canonical, self.model, self.zoom_question, self.zoom_model
+        )
         started = time.perf_counter()
         limit = min(self.timeout, timeout) if timeout is not None else self.timeout
         data = bounded_post(self.provider, payload, limit, cancelled)
         ranking = parse_ranking(self.provider, data, candidates, self.zoom_question)
+        if self.provider == "zoom" and data.get("model") != self.zoom_model:
+            raise ProviderError("model_mismatch", "Zoom did not confirm the requested model")
         ranking.latency_ms = (time.perf_counter() - started) * 1000
         ranking.request = payload
         ranking.request_contract_sha256 = request_contract_fingerprint(self.provider, payload)
         return ranking
 
 
+def authentication_headers(provider):
+    headers = {"Content-Type": "application/json"}
+    if provider == "zoom" and os.environ.get("ZOOM_ACCESS_TOKEN"):
+        headers["Authorization"] = f"Bearer {os.environ['ZOOM_ACCESS_TOKEN']}"
+    elif provider == "zoom":
+        headers["x-api-key"] = os.environ["ZOOM_API_KEY"]
+    else:
+        headers["Authorization"] = f"Bearer {os.environ[KEYS[provider]]}"
+    return headers
+
+
 def raw_post(provider, payload, timeout):
     """Worker-only HTTP transport. A parent process enforces the total deadline."""
-    key = os.environ[KEYS[provider]]
-    headers = {"Content-Type": "application/json"}
-    headers["Authorization" if provider == "jev" else "x-api-key"] = (
-        f"Bearer {key}" if provider == "jev" else key
-    )
+    headers = authentication_headers(provider)
     request = urllib.request.Request(
         URLS[provider],
         data=json.dumps(payload, allow_nan=False).encode(),

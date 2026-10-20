@@ -286,7 +286,7 @@ def test_matching_request_fingerprints_cover_input_order_objective_and_controls(
     jev = payload_for("jev", canonical)
     zoom = payload_for("zoom", canonical)
     assert set(jev) == {"model", "state", "questions"}
-    assert set(zoom) == {"input", "questions"}
+    assert set(zoom) == {"input", "questions", "model"}
     expected = request_contract_fingerprint("jev", jev)
     assert request_contract_fingerprint("zoom", zoom) == expected
     extra = copy.deepcopy(jev)
@@ -336,3 +336,50 @@ def test_comparison_settings_do_not_claim_unknown_model_defaults_match():
     result = comparison_parameters(config)
     assert not result["question_formats_match"]
     assert result["identical_state_evaluation"]
+
+
+@pytest.mark.parametrize("model", ["zoom-decisions", "zoom-decisions-pro"])
+@pytest.mark.parametrize("question", ["choice", "predicate"])
+def test_zoom_model_payload(model, question, canonical):
+    from mario_eval.rankers import request_contract_fingerprint
+
+    payload = payload_for("zoom", canonical, zoom_question=question, zoom_model=model)
+    assert payload["model"] == model
+    baseline = payload_for("zoom", canonical, zoom_question=question)
+    assert request_contract_fingerprint("zoom", payload) == request_contract_fingerprint(
+        "zoom", baseline
+    )
+    assert payload_for("jev", canonical, zoom_model=model)["model"] == "jev-latest"
+
+
+def test_zoom_pro_roundtrip_and_wrong_model_rejected(canonical, monkeypatch):
+    monkeypatch.setenv("ZOOM_ACCESS_TOKEN", "test-token")
+    monkeypatch.delenv("ZOOM_API_KEY", raising=False)
+    response = choice_response()
+    response["model"] = "zoom-decisions-pro"
+
+    def respond(provider, payload, limit, cancelled):
+        assert payload["model"] == "zoom-decisions-pro"
+        return response
+
+    monkeypatch.setattr("mario_eval.rankers.bounded_post", respond)
+    ranker = Ranker("zoom", zoom_model="zoom-decisions-pro")
+    assert ranker.choose(canonical).metadata["model"] == "zoom-decisions-pro"
+    response["model"] = "zoom-decisions"
+    with pytest.raises(ProviderError) as error:
+        ranker.choose(canonical)
+    assert error.value.category == "model_mismatch"
+
+
+def test_zoom_authentication_precedence(monkeypatch):
+    from mario_eval.rankers import authentication_headers
+
+    monkeypatch.setenv("ZOOM_API_KEY", "legacy-key")
+    monkeypatch.setenv("ZOOM_ACCESS_TOKEN", "access-token")
+    headers = authentication_headers("zoom")
+    assert headers["Authorization"] == "Bearer access-token"
+    assert "x-api-key" not in headers
+    monkeypatch.delenv("ZOOM_ACCESS_TOKEN")
+    headers = authentication_headers("zoom")
+    assert headers["x-api-key"] == "legacy-key"
+    assert "Authorization" not in headers

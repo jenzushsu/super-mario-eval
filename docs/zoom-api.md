@@ -1,10 +1,21 @@
 # Zoom Decisions reference
 
-Source: user-supplied predicate, choice, score, and mixed-question requests and
-successful response JSON. These are observed examples, not a complete service
-specification. No browser scraping was performed.
+Sources: the user-uploaded AI Services API Markdown reference (reviewed 2026-10-20),
+from https://developers.zoom.us/docs/api/ai-services.md, and earlier successful
+request/response examples. No browser scraping was performed.
 
-All examples POST to `https://api.zoom.us/v2/aiservices/decisions/decide` with
+The released reference documents bearer access-token authentication, scope
+`aiservices:write:decide:admin`, and a Zoom AI Services or Universal SDK entitlement.
+Set `ZOOM_ACCESS_TOKEN` for assisted/realtime/evaluate; it takes precedence over the
+legacy API key. `--zoom-model` explicitly sends `zoom-decisions` (default) or
+`zoom-decisions-pro`; Pro may require another entitlement. Returned model IDs must
+match the requested variant. These aliases do not pin the underlying implementation.
+No temperature/top-p/inference seed controls are documented for this endpoint.
+Confidence has no specified formula/range; refusals currently stop the run as schema
+errors. Neither is used to select a move. A controlled Pro-versus-standard live
+benchmark has not yet been completed.
+
+The earlier user examples POST to `https://api.zoom.us/v2/aiservices/decisions/decide` with
 `x-api-key: <ZOOM_API_KEY>` and `Content-Type: application/json`. Inputs can be
 plain text strings. The image example uses a user message/content array containing
 `input_text` and `input_image`, plus `enable_image_input: true`.
@@ -13,6 +24,7 @@ plain text strings. The image example uses a user message/content array containi
 
 ```json
 {
+  "model": "zoom-decisions",
   "input": "<serialized shared Mario state and simulated outcomes>",
   "questions": [{
     "name": "action",
