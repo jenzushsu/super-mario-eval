@@ -55,3 +55,21 @@ uv run --frozen python docs/blog/zoom-decisions-mario/render_replay.py PATH_TO_Z
 Use the standard-Decisions depth-1 run `20261020T072748Z-ecc33471`. The script is
 specific to standard-Decisions captions and rejects another returned model ID.
 All before/after and final state digests must match; no API keys are required.
+
+## Blog charts
+
+- [Clear rates](assets/clear-rates.png): separate Jev pairings; observed counts, not projected success probabilities.
+- [Lookahead trade-off](assets/lookahead-tradeoff.png): aligned panels for average decisions and simulation frames per Zoom episode, with zero-based axes.
+
+Both are generated solely from `results.csv`; PNG is suitable for embedding and SVG
+for scaling or editing. The article embeds the PNGs with descriptive alt text.
+No new model calls or GUI runs were used. Rebuild without changing the app environment:
+
+```sh
+uv run --no-project --with matplotlib==3.10.8 python docs/blog/zoom-decisions-mario/render_charts.py
+```
+
+Depth-2 decision-count reductions are 6.2% (standard) and 13.9% (Pro); simulation-frame
+ratios are 5.8x and 5.3x. The figures do not equate simulation frames to tokens, money,
+or elapsed time. These repeated development-stage samples are not independent unseen
+levels; the charts do not claim statistical superiority.

@@ -107,6 +107,8 @@ All runs used native choice, the same seven actions, the same objective, no auto
 | Jev vs Decisions | 2 | 10/10 | 10/10 | 30.3 | 433,074 |
 | Jev vs Pro | 2 | 9/10 | 10/10 | 29.0 | 416,445 |
 
+![Stage-clear rates for each pairing and depth: all Zoom batches cleared 10/10; Jev cleared 10/10 except 9/10 against Pro at depth 2.](assets/clear-rates.png)
+
 There were no model-controlled deaths or API failures in these final batches. The one unsuccessful Jev episode stalled. The deterministic search baseline stalled in all 40 of its episodes; it retained its original selection rule and did not use the new third-move summary for scoring.
 
 Here, a clear means the emulator reported reaching the flag and completing **stage 1-1**, not finishing every level of Super Mario Bros. The corresponding report field is `reason: "completed"`.
@@ -118,6 +120,8 @@ Here, a clear means the emulator reported reaching the flag and completing **sta
 ## Is deeper lookahead worth it?
 
 On this stage, depth 1 already achieved 10/10 for both Zoom variants. Depth 2 reduced average decisions from 32.3 to 30.3 for standard Decisions and from 33.7 to 29.0 for Pro. But it required approximately 5.8× and 5.3× as many simulation frames, respectively.
+
+![Two panels comparing average model decisions and simulation frames: deeper lookahead reduced decision counts but required 5.8 times the simulation for Decisions and 5.3 times for Pro.](assets/lookahead-tradeoff.png)
 
 That makes depth 1 the practical baseline for this task. Pro used the fewest decisions at depth 2, but there was no additional Zoom completion benefit to offset the extra simulation work in these batches.
 
