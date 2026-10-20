@@ -310,9 +310,25 @@ Defaults per policy/episode: `--max-decisions 25`, `--game-frames 3600`,
 A stall means no new best position within the configured actual frame interval.
 Simulation can take much longer than the resulting gameplay; its status is visible.
 
+### Zoom HTTP 400 after the v6 update
+
+The v6 shared instructions grew to 2,378 characters. All nine requests in one
+uploaded standard-Zoom evaluation returned HTTP 400; the provider response bodies
+were not retained, so the exact validation rule is unconfirmed. v7 compacts the
+same decision guidance to 1,300 characters for **both** providers, below the earlier
+successful v5 instruction size (1,482). No official length limit is inferred.
+HTTP 400 responses now supply fixed hints when common validation fields mention
+instruction/description length, input/context limits, or an unsupported model.
+Provider messages and input echoes are never printed.
+
+Existing `progress-cycles-v2` corpora remain valid; no download or recapture is
+needed. Update the repo and first evaluate a single case with `--max-decisions 1`.
+Only resume full batches after both APIs succeed. Keep v6 and v7 results separate;
+repeat all four comparisons with v7 for a consistent experiment.
+
 ### Targeted progress and deeper-lookahead experiment
 
-The v6 prompt and `progress-cycles-v2` evidence separate immediate displacement,
+The v7 prompt and `progress-cycles-v2` evidence separate immediate displacement,
 immediate endpoint gain, and immediate completion from hypothetical follow-up
 progress. A zero-progress move does not earn actual progress merely because a later
 jump could advance. Survival still takes priority, and waits/retreats remain valid.
@@ -348,7 +364,7 @@ See [the investigation and validation plan](docs/targeted-investigation.md).
 
 ### Shared history and continuation evidence
 
-Both providers receive the same `outcome-ranker-v6` instructions and fields:
+Both providers receive the same `outcome-ranker-v7` instructions and fields:
 
 - `history.recent_controls`: the last eight groups of actual controller buttons,
   with their frame counts and displacement. These are executed controls, not

@@ -383,3 +383,55 @@ def test_zoom_authentication_precedence(monkeypatch):
     headers = authentication_headers("zoom")
     assert headers["x-api-key"] == "legacy-key"
     assert "Authorization" not in headers
+
+
+def test_bad_request_validation_hint_does_not_echo_provider_text(monkeypatch, canonical):
+    import io
+
+    monkeypatch.setenv("ZOOM_API_KEY", "test-key")
+    secret = "sensitive-provider-echo"
+    body = json.dumps(
+        {
+            "detail": [
+                {
+                    "loc": ["body", "questions", 0, "instructions"],
+                    "msg": "String should have at most 2048 characters " + secret,
+                    "type": "string_too_long",
+                    "input": secret,
+                }
+            ]
+        }
+    ).encode()
+
+    def reject(request, timeout):
+        raise urllib.error.HTTPError(request.full_url, 400, "Bad Request", {}, io.BytesIO(body))
+
+    monkeypatch.setattr("urllib.request.urlopen", reject)
+    with pytest.raises(ProviderError) as error:
+        raw_post("zoom", payload_for("zoom", canonical), 2)
+    assert "instruction length limit" in str(error.value)
+    assert secret not in str(error.value)
+    assert error.value.category == "http"
+
+
+def test_unknown_bad_request_remains_generic():
+    import io
+
+    from mario_eval.rankers import bad_request_hint
+
+    assert bad_request_hint(io.BytesIO(b"<html>private proxy response</html>")) == ""
+    assert (
+        bad_request_hint(
+            io.BytesIO(b'{"input":"instructions too long", "message":"private value"}')
+        )
+        == ""
+    )
+
+
+def test_shared_prompt_stays_within_previous_successful_size(canonical):
+    # Conservative regression budget, not a claim about an official API limit.
+    jev = payload_for("jev", canonical)
+    zoom = payload_for("zoom", canonical)
+    instructions = zoom["questions"][0]["instructions"]
+    assert instructions == jev["questions"]["action"]["instructions"]
+    assert len(instructions) <= 1482

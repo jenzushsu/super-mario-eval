@@ -15,33 +15,24 @@ from dataclasses import dataclass, field
 
 from .simulation import rank_outcome
 
-PROMPT_VERSION = "outcome-ranker-v6"
+PROMPT_VERSION = "outcome-ranker-v7"
 OBJECTIVE = (
-    "Choose the candidate that makes progress toward the flag without dying. "
-    "Apply priorities in order: completion; survival with a viable next move; then progress. "
-    "Never choose a move marked dead when a surviving alternative exists, even if it travels farther. "
-    "Avoid a move whose complete seven-follow-up set is all fatal when a viable alternative exists. "
-    "Wait or back can be the best move: momentum can carry Mario into danger even while walking. "
-    "These are finite-horizon observations, not guarantees of future success. "
-    "Unknown outcomes are not evidence of death or safety. "
-    "Use continuation_summary to distinguish complete, partial, and untested coverage. "
-    "Prefer viable future moves over immediate distance alone; partial fatal follow-ups do not prove a trap. "
-    "An immediate clear completes the stage even when no follow-ups were tested and future progress is null. "
-    "Separate progress_summary.immediate_dx and immediate_endpoint_gain_beyond_best_x from hypothetical two-move progress. "
-    "Only immediate progress is achieved by this choice; future progress requires another decision and is not guaranteed. "
-    "When third_move_summary is present, use it to check survival through two hypothetical follow-up decisions. "
-    "Avoid a complete all-fatal third-move tree when another candidate has a surviving path; unknown paths are inconclusive. "
-    "Path counts are not survival probabilities. Terminal clear paths need no further moves. "
-    "Among surviving routes, compare progress_summary.best_surviving_two_move_dx and gain_beyond_best_x. "
-    "A smaller first move with forward surviving follow-ups can beat a larger move that leaves only waiting or retreat. "
-    "Null progress means untested or no observed surviving continuation, not zero progress or proven death. "
-    "Use recent_decisions and prior_attempts_without_new_best to avoid repeating an unproductive area/action cycle. "
-    "When repeated waits or movement attempts gain no new ground, prefer an immediately advancing viable alternative over deferring the same progress again. "
-    "Do not sacrifice survival for immediate distance; useful waits and retreats remain valid. "
-    "Area matches are approximate: enemies and timing can change; do not ban useful waits or retreats. "
-    "Use history to recognize repeated no-progress actions, while allowing useful waits and retreats. "
-    "Only your chosen move executes; follow-ups are hypothetical and must be selected on a later decision."
+    "Choose one move. Priorities: finish the stage, survive with a viable next move, then progress. "
+    "Immediate clear wins even if future progress is null. Avoid dead moves when a survivor exists. "
+    "Use continuation_summary: avoid complete all-fatal follow-ups when a viable alternative exists. "
+    "If third_move_summary exists, check survival through two follow-ups; avoid complete all-fatal trees "
+    "when another move has a surviving path. Counts are not probabilities. Clear paths end early. "
+    "Unknown, partial and untested outcomes prove neither safety nor death. Horizons are finite. "
+    "Separate progress_summary.immediate_dx and immediate_endpoint_gain_beyond_best_x from hypothetical "
+    "best_surviving_two_move_dx and gain_beyond_best_x. Only the chosen move executes; follow-ups need "
+    "later choices. Null future progress is not zero or certain death. Compare viable routes, not just "
+    "immediate distance: a smaller move may offer better surviving forward follow-ups. "
+    "Use recent_decisions and prior_attempts_without_new_best to detect cycles. After repeated zero "
+    "progress, prefer an immediately advancing viable move over deferring progress again. Survival "
+    "still comes first. Wait/back can be useful due to momentum or hazards; approximate area matches "
+    "do not prove identical timing. Do not ban useful waits or retreats."
 )
+
 URLS = {
     "jev": "https://api.typesafe.ai/v1/systemone",
     "zoom": "https://api.zoom.us/v2/aiservices/decisions/decide",
@@ -334,6 +325,41 @@ def authentication_headers(provider):
     return headers
 
 
+def bad_request_hint(response):
+    """Emit fixed diagnostic labels only, never provider text or echoed inputs."""
+    try:
+        body = json.loads(response.read(65536))
+    except (ValueError, OSError, TypeError):
+        return ""
+
+    # Ignore input/request echoes; inspect only common validation metadata fields.
+    def messages(value):
+        if isinstance(value, list):
+            return " ".join(messages(v) for v in value[:32])
+        if isinstance(value, dict):
+            return " ".join(
+                messages(v)
+                for k, v in value.items()
+                if k
+                in ("error", "errors", "detail", "message", "msg", "type", "param", "loc", "code")
+            )
+        return value.lower() if isinstance(value, str) else ""
+
+    text = messages(body)
+    length = any(
+        word in text for word in ("length", "too long", "at most", "maximum", "too large", "limit")
+    )
+    if "instruction" in text and length:
+        return " (validation response mentions an instruction length limit)"
+    if "description" in text and length:
+        return " (validation response mentions a description length limit)"
+    if any(word in text for word in ("context", "token", "input")) and length:
+        return " (validation response mentions an input/context limit)"
+    if "model" in text and any(word in text for word in ("invalid", "unsupported", "not allowed")):
+        return " (validation response mentions an unsupported model)"
+    return ""
+
+
 def raw_post(provider, payload, timeout):
     """Worker-only HTTP transport. A parent process enforces the total deadline."""
     headers = authentication_headers(provider)
@@ -347,9 +373,10 @@ def raw_post(provider, payload, timeout):
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.load(response)
     except urllib.error.HTTPError as exc:
+        hint = bad_request_hint(exc) if exc.code == 400 else ""
         raise ProviderError(
             "authentication" if exc.code in (401, 403) else "http",
-            f"{provider} returned HTTP {exc.code}",
+            f"{provider} returned HTTP {exc.code}{hint}",
         ) from None
     except (TimeoutError, urllib.error.URLError):
         raise ProviderError(
