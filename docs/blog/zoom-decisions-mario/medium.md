@@ -4,6 +4,8 @@
 
 A decision API returns a small answer. In a game, that answer can have a very visible consequence: Mario advances, stalls, or falls into a pit.
 
+[Zoom Decisions API](https://developers.zoom.us/docs/ai-services/decisions/) lets applications ask structured questions about supplied input: whether a condition is true (`predicate`), which option to select (`choice`), or how to rate something against defined levels (`score`). It returns structured answers that application code can use. For Mario, we used the `choice` format to select a move from seven candidates and compared the standard Decisions model with Decisions Pro.
+
 We built a Super Mario Bros. stage-1-1 experiment around Zoom Decisions API to explore that connection. In the final default-depth evaluation, **Zoom Decisions and Decisions Pro each cleared the stage in all 10 episodes, without a survival guard**. TypeSafe Jev, our comparison model, also cleared all 10 episodes in each pairing.
 
 Getting there was more interesting than the final score. An earlier Pro configuration died on every attempt, while Jev repeatedly stalled. Saved checkpoints helped us investigate those failures and improve the evidence supplied to every model.
