@@ -127,28 +127,19 @@ That makes depth 1 the practical baseline for this task. Pro used the fewest dec
 
 Median recorded API latency was about 1.13 seconds for standard Decisions and 1.42 seconds for Pro in their depth-1 batches. These are observations from this setup, not service benchmarks: batch timing indicates overlapping execution, which may affect latency and runtime. We recorded usage but did not establish monetary cost. Fewer decisions do not necessarily mean lower cost, because request size, caching, and pricing also matter.
 
-## Reproduce the experiment
-
-The repository is [jenzushsu/super-mario-eval](https://github.com/jenzushsu/super-mario-eval). Its README covers Python 3.13, `uv`, and local credentials. From a configured checkout, run:
-
-```sh
-uv run --frozen --env-file .env mario-eval assisted --zoom-model zoom-decisions --depth 1 --episodes 10 --seed 123 --max-decisions 100 --game-frames 3600 --simulation-frames 1000000 --wall-seconds 1200 --stall-frames 360 --timeout 30 --headless --artifacts-dir artifacts/blog-decisions
-```
-
-For Pro, replace `zoom-decisions` with `zoom-decisions-pro` and use a separate output directory. Leave Jev's `--model` unset to retain `jev-latest`. Run batches sequentially. Inspect `report.md`, `summary.json`, and the per-provider JSONL logs.
-
-The uploaded runs record commit `ee7581e1ca80fa23f63e43add60a79522507b551`, prompt `outcome-ranker-v7`, and evidence `progress-cycles-v2`, but also record `dirty: true`. The local source diff was not supplied, so exact source reproducibility is unresolved. Model IDs are aliases, not immutable weight versions.
-
 ## What this experiment establishes
 
 Zoom Decisions API worked as a structured action selector in this simulation-assisted setup. Both variants completed every final Zoom episode, and controlled checkpoint tests helped reveal where better evidence could change choices.
 
 It does not establish that Zoom universally outperforms Jev, that Pro is universally better than standard Decisions, or that these models can play unaided from pixels. The level and failure checkpoints were used during development. Ten repeated episodes on one layout, even with different seeds, do not establish generalization or guarantee a 100% future clear rate.
 
+The uploaded runs record commit `ee7581e1ca80fa23f63e43add60a79522507b551`, prompt `outcome-ranker-v7`, and evidence `progress-cycles-v2`, but also record `dirty: true`. The local source diff was not supplied, so exact source reproducibility is unresolved. Model IDs are aliases, not immutable weight versions.
+
 The useful next experiment is a frozen configuration on unseen levels or starting conditions. For this case study, the central lesson is already concrete: a decision API needs evidence that distinguishes what an action accomplishes now from what might become possible later.
 
 ## References and accompanying data
 
+- [Experiment repository](https://github.com/jenzushsu/super-mario-eval).
 - [Zoom AI Services API reference](https://developers.zoom.us/docs/api/ai-services.md), reviewed from the user-uploaded Markdown reference.
 - [4esv/jev-mario](https://github.com/4esv/jev-mario), methodology reference for simulation-assisted Mario evaluation; its assistance differs from this implementation.
 - [Hugging Face Lighteval](https://github.com/huggingface/lighteval), a reference for custom tasks, metrics, and per-sample evaluation. This experiment used our own runner, not Lighteval, and is not an official Hugging Face benchmark.
