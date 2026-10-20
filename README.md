@@ -5,6 +5,9 @@ Uses [fhshaik/typesafe-mario](https://github.com/fhshaik/typesafe-mario) at comm
 `ca22449ed187118d19326d1f54b01b6636578aa4` for the emulator, state parser, actions,
 and, in direct mode, the unmodified Jev policy. Upstream source is installed as a dependency, not copied.
 
+Read the [Zoom Decisions Mario case study draft](docs/blog/zoom-decisions-mario/article.md)
+for final v7 results, methodology, and an annotated stage-clear replay.
+
 ## Choose an approach
 
 Complete [local setup](#run-locally) first. All live commands need both API keys.

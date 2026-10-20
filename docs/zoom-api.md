@@ -12,8 +12,8 @@ legacy API key. `--zoom-model` explicitly sends `zoom-decisions` (default) or
 match the requested variant. These aliases do not pin the underlying implementation.
 No temperature/top-p/inference seed controls are documented for this endpoint.
 Confidence has no specified formula/range; refusals currently stop the run as schema
-errors. Neither is used to select a move. A controlled Pro-versus-standard live
-benchmark has not yet been completed.
+errors. Neither is used to select a move. User-uploaded standard/Pro gameplay comparisons
+are summarized in the [Mario case study draft](blog/zoom-decisions-mario/article.md).
 
 The earlier user examples POST to `https://api.zoom.us/v2/aiservices/decisions/decide` with
 `x-api-key: <ZOOM_API_KEY>` and `Content-Type: application/json`. Inputs can be
@@ -102,8 +102,8 @@ assisted comparison asks both services only for an action choice; score and
 predicate diagnostics are documented but not added to that task.
 
 User-uploaded gameplay logs demonstrate successful seven-predicate calls. Native
-choice parsing is tested against the supplied response structure; improved Mario
-performance with native choice remains unverified. Earlier cloud calls returned
+choice requests also succeeded in the uploaded v7 gameplay batches. These results
+do not isolate question format as the cause of performance differences. Earlier cloud calls returned
 HTTP 403, while user-local calls succeeded. No credentials are stored in this repo.
 
 Requests use standard-library urllib in a subprocess with a total deadline,

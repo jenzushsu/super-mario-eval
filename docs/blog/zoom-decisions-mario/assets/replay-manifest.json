@@ -1,0 +1,13 @@
+{
+  "source_run": "20261020T072748Z-ecc33471",
+  "source_log": "zoom-001.jsonl",
+  "source_sha256": "e9d505cff40e0472e9cd8da299977b26abfabc3e3912c8bb214952b57c307754",
+  "model": "zoom-decisions",
+  "depth": 1,
+  "seed": 123,
+  "verified_gameplay_frames": 1822,
+  "hold_frames": 120,
+  "clear": true,
+  "decision_count": 32,
+  "note": "Frame-by-frame recorded-control replay, rendered at 30 fps from 60 emulator fps. API and simulation waits omitted; final frame held two seconds. No fresh API calls."
+}

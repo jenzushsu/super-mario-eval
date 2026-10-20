@@ -1,0 +1,77 @@
+{
+  "sources": [
+    {
+      "run_id": "20261020T072748Z-ecc33471",
+      "summary_sha256": "df5cf400dd7e2397582b74394806252a57fa3cccf30db02eadf7cf4c882b7db4",
+      "config_sha256": "19fbe9df6d36ea5f46911293f92bc9c497ce1ecc97d2d860496ee2bf3815f121",
+      "application_commit": "ee7581e1ca80fa23f63e43add60a79522507b551",
+      "dirty": true,
+      "zoom_model": "zoom-decisions",
+      "depth": 1,
+      "limits": {
+        "max_decisions": 100,
+        "game_frames": 3600,
+        "simulation_frames": 1000000,
+        "wall_seconds": 1200,
+        "stall_frames": 360,
+        "timeout": 30
+      }
+    },
+    {
+      "run_id": "20261020T073343Z-c81efe77",
+      "summary_sha256": "4b94fb3503481fa37c86b899ee57981ed31b8185522353bb4a34ba7bf2020350",
+      "config_sha256": "c6a8281daac0b7cfdfba019e297cc1b6f737eb80673b6cf3d5404db3027382ba",
+      "application_commit": "ee7581e1ca80fa23f63e43add60a79522507b551",
+      "dirty": true,
+      "zoom_model": "zoom-decisions-pro",
+      "depth": 1,
+      "limits": {
+        "max_decisions": 100,
+        "game_frames": 3600,
+        "simulation_frames": 1000000,
+        "wall_seconds": 1200,
+        "stall_frames": 360,
+        "timeout": 30
+      }
+    },
+    {
+      "run_id": "20261020T073925Z-47d4992a",
+      "summary_sha256": "a25e9a9507f22c80211e20f47303ec596160695ce2b8b709d517349c1a5d22fe",
+      "config_sha256": "57d4645fe02305ae99b3300805379f356284f441255a83f80bfa392a7d51d021",
+      "application_commit": "ee7581e1ca80fa23f63e43add60a79522507b551",
+      "dirty": true,
+      "zoom_model": "zoom-decisions",
+      "depth": 2,
+      "limits": {
+        "max_decisions": 100,
+        "game_frames": 3600,
+        "simulation_frames": 1000000,
+        "wall_seconds": 1200,
+        "stall_frames": 360,
+        "timeout": 30
+      }
+    },
+    {
+      "run_id": "20261020T074552Z-b0fcdbe4",
+      "summary_sha256": "ffe07103ff3184fad8a154dd3d073f1ff6cdc8b6cfd90c5b95596fc30e373291",
+      "config_sha256": "057589c3e8ced4a4610129bd122d5e21a177797e7f1448fcd02c60517787f2f5",
+      "application_commit": "ee7581e1ca80fa23f63e43add60a79522507b551",
+      "dirty": true,
+      "zoom_model": "zoom-decisions-pro",
+      "depth": 2,
+      "limits": {
+        "max_decisions": 100,
+        "game_frames": 3600,
+        "simulation_frames": 1000000,
+        "wall_seconds": 1200,
+        "stall_frames": 360,
+        "timeout": 30
+      }
+    }
+  ],
+  "notes": [
+    "Uploaded runs report local modifications; local source diff was not supplied.",
+    "No ROMs, credentials, user filesystem paths, or full request logs are included.",
+    "Batch timestamps and durations indicate overlapping execution; latency and wall-time comparisons may be affected."
+  ]
+}

@@ -1,0 +1,43 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 768
+PlayResY: 840
+WrapStyle: 2
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,DejaVu Sans,22,&H00FFFFFF,&H00FFFFFF,&H00111827,&H00111827,0,0,0,0,100,100,0,0,1,1,0,8,12,12,10,1
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:00.87,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 1/32: run\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:00.87,0:00:02.07,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 2/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:02.07,0:00:02.93,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 3/32: walk\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:02.93,0:00:03.93,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 4/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:03.93,0:00:04.80,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 5/32: hop\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:04.80,0:00:05.87,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 6/32: jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:05.87,0:00:06.73,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 7/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:06.73,0:00:07.60,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 8/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:07.60,0:00:08.75,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 9/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:08.75,0:00:09.67,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 10/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:09.67,0:00:10.58,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 11/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:10.58,0:00:11.50,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 12/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:11.50,0:00:12.78,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 13/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:12.78,0:00:13.65,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 14/32: wait\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:13.65,0:00:14.52,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 15/32: hop\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:14.52,0:00:15.38,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 16/32: wait\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:15.38,0:00:16.63,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 17/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:16.63,0:00:17.50,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 18/32: jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:17.50,0:00:18.62,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 19/32: jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:18.62,0:00:19.55,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 20/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:19.55,0:00:20.42,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 21/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:20.42,0:00:21.28,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 22/32: hop\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:21.28,0:00:22.15,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 23/32: jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:22.15,0:00:23.18,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 24/32: jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:23.18,0:00:24.05,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 25/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:24.05,0:00:25.05,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 26/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:25.05,0:00:25.92,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 27/32: wait\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:25.92,0:00:26.78,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 28/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:26.78,0:00:27.65,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 29/32: run_jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:27.65,0:00:28.52,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 30/32: jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:28.52,0:00:29.77,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 31/32: hop\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:29.77,0:00:30.37,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1\NDecision 32/32: jump\NRecorded replay: API/simulation waits omitted
+Dialogue: 0,0:00:30.37,0:00:32.37,Default,,0,0,0,,{\an8\pos(384,10)}Zoom Decisions | stage 1-1 CLEARED\NRecorded replay: API/simulation waits omitted

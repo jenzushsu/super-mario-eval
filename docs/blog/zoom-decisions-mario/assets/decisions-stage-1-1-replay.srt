@@ -1,0 +1,196 @@
+1
+00:00:00,000 --> 00:00:00,867
+Zoom Decisions | stage 1-1
+Decision 1/32: run
+Recorded replay: API/simulation waits omitted
+
+2
+00:00:00,867 --> 00:00:02,067
+Zoom Decisions | stage 1-1
+Decision 2/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+3
+00:00:02,067 --> 00:00:02,933
+Zoom Decisions | stage 1-1
+Decision 3/32: walk
+Recorded replay: API/simulation waits omitted
+
+4
+00:00:02,933 --> 00:00:03,933
+Zoom Decisions | stage 1-1
+Decision 4/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+5
+00:00:03,933 --> 00:00:04,800
+Zoom Decisions | stage 1-1
+Decision 5/32: hop
+Recorded replay: API/simulation waits omitted
+
+6
+00:00:04,800 --> 00:00:05,867
+Zoom Decisions | stage 1-1
+Decision 6/32: jump
+Recorded replay: API/simulation waits omitted
+
+7
+00:00:05,867 --> 00:00:06,733
+Zoom Decisions | stage 1-1
+Decision 7/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+8
+00:00:06,733 --> 00:00:07,600
+Zoom Decisions | stage 1-1
+Decision 8/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+9
+00:00:07,600 --> 00:00:08,750
+Zoom Decisions | stage 1-1
+Decision 9/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+10
+00:00:08,750 --> 00:00:09,667
+Zoom Decisions | stage 1-1
+Decision 10/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+11
+00:00:09,667 --> 00:00:10,583
+Zoom Decisions | stage 1-1
+Decision 11/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+12
+00:00:10,583 --> 00:00:11,500
+Zoom Decisions | stage 1-1
+Decision 12/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+13
+00:00:11,500 --> 00:00:12,783
+Zoom Decisions | stage 1-1
+Decision 13/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+14
+00:00:12,783 --> 00:00:13,650
+Zoom Decisions | stage 1-1
+Decision 14/32: wait
+Recorded replay: API/simulation waits omitted
+
+15
+00:00:13,650 --> 00:00:14,517
+Zoom Decisions | stage 1-1
+Decision 15/32: hop
+Recorded replay: API/simulation waits omitted
+
+16
+00:00:14,517 --> 00:00:15,383
+Zoom Decisions | stage 1-1
+Decision 16/32: wait
+Recorded replay: API/simulation waits omitted
+
+17
+00:00:15,383 --> 00:00:16,633
+Zoom Decisions | stage 1-1
+Decision 17/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+18
+00:00:16,633 --> 00:00:17,500
+Zoom Decisions | stage 1-1
+Decision 18/32: jump
+Recorded replay: API/simulation waits omitted
+
+19
+00:00:17,500 --> 00:00:18,617
+Zoom Decisions | stage 1-1
+Decision 19/32: jump
+Recorded replay: API/simulation waits omitted
+
+20
+00:00:18,617 --> 00:00:19,550
+Zoom Decisions | stage 1-1
+Decision 20/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+21
+00:00:19,550 --> 00:00:20,417
+Zoom Decisions | stage 1-1
+Decision 21/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+22
+00:00:20,417 --> 00:00:21,283
+Zoom Decisions | stage 1-1
+Decision 22/32: hop
+Recorded replay: API/simulation waits omitted
+
+23
+00:00:21,283 --> 00:00:22,150
+Zoom Decisions | stage 1-1
+Decision 23/32: jump
+Recorded replay: API/simulation waits omitted
+
+24
+00:00:22,150 --> 00:00:23,183
+Zoom Decisions | stage 1-1
+Decision 24/32: jump
+Recorded replay: API/simulation waits omitted
+
+25
+00:00:23,183 --> 00:00:24,050
+Zoom Decisions | stage 1-1
+Decision 25/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+26
+00:00:24,050 --> 00:00:25,050
+Zoom Decisions | stage 1-1
+Decision 26/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+27
+00:00:25,050 --> 00:00:25,917
+Zoom Decisions | stage 1-1
+Decision 27/32: wait
+Recorded replay: API/simulation waits omitted
+
+28
+00:00:25,917 --> 00:00:26,783
+Zoom Decisions | stage 1-1
+Decision 28/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+29
+00:00:26,783 --> 00:00:27,650
+Zoom Decisions | stage 1-1
+Decision 29/32: run + jump
+Recorded replay: API/simulation waits omitted
+
+30
+00:00:27,650 --> 00:00:28,517
+Zoom Decisions | stage 1-1
+Decision 30/32: jump
+Recorded replay: API/simulation waits omitted
+
+31
+00:00:28,517 --> 00:00:29,767
+Zoom Decisions | stage 1-1
+Decision 31/32: hop
+Recorded replay: API/simulation waits omitted
+
+32
+00:00:29,767 --> 00:00:30,367
+Zoom Decisions | stage 1-1
+Decision 32/32: jump
+Recorded replay: API/simulation waits omitted
+
+33
+00:00:30,367 --> 00:00:32,367
+Zoom Decisions | stage 1-1 CLEARED
+Recorded replay: API/simulation waits omitted
