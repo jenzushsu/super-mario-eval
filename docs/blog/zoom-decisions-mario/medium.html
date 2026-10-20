@@ -35,9 +35,26 @@
 <p>Depth 1 means a candidate plus one follow-up. Depth 2 means a candidate plus two follow-ups. The default remains depth 1. The survival guard was disabled throughout the final evaluations.</p>
 <p>One integration regression also mattered: expanded instructions accompanied HTTP 400 failures from Zoom. Compacting the shared instructions from 2,378 to 1,300 characters was followed by successful requests. The rejected response bodies were not retained, so an instruction-length limit remains a hypothesis, not a verified API constraint.</p>
 <p>These changes were prompt and evidence engineering, not model-weight fine-tuning.</p>
+<h2>Benchmark design and parameters</h2>
+<p>This was a custom, simulation-assisted benchmark on <strong>Super Mario Bros. stage 1-1</strong>, not an official Hugging Face benchmark. The final gameplay evaluation had four batches: Jev versus Decisions at depth 1 and depth 2, and Jev versus Decisions Pro at depth 1 and depth 2.</p>
+<p><strong>Sample size and environment.</strong> Each batch contained ten episodes per model, using emulator seeds 123–132 in <code>SuperMarioBros-1-1-v0</code>. That produced 80 model-controlled episodes: 40 Jev, 20 Decisions, and 20 Pro. The search baseline ran another 40 episodes, reported separately. Different seeds on this fixed layout do not represent different levels or independently sampled tasks.</p>
+<p><strong>Models.</strong> Jev was requested through <code>jev-latest</code>; responses identified <strong><code>jev-1.13.0</code></strong>. Jev 1.14.0 was not evaluated. Zoom was explicitly requested as <strong><code>zoom-decisions</code></strong> or <strong><code>zoom-decisions-pro</code></strong>, and the returned identifiers were checked. These service identifiers are not immutable weight snapshots.</p>
+<p><strong>Shared task and inputs.</strong> Both services used native <code>choice</code> questions, the same objective, and the same seven action macros: <code>run</code>, <code>walk</code>, <code>jump</code>, <code>run_jump</code>, <code>hop</code>, <code>wait</code>, and <code>back</code>. The shared prompt was <code>outcome-ranker-v7</code>, the evidence format was <code>progress-cycles-v2</code>, and the action set was <code>simple-macros-v1</code>. Inputs described simulator-measured outcomes rather than screenshots. The final gameplay runs used independent parallel lanes: each model chose its own trajectory. After their choices diverged, their observations could differ. The earlier identical-state checkpoint tests were a separate diagnostic evaluation.</p>
+<p><strong>Simulation settings.</strong> The candidate horizon was 48 frames, with a landing cap of 72 additional frames and 4 settling frames. Depth 1 tested a candidate plus one follow-up; depth 2 tested a candidate plus two follow-ups, using continuation set <code>all-seven-airborne-v2</code>. These settings were shared within each pairing. Simulation frames include hypothetical exploration and are distinct from executed gameplay frames.</p>
+<p><strong>Assistance and timing.</strong> Survival guard, automatic escape, and automatic follow-up execution were all disabled. The emulator paused during inference and simulation. Parallel lanes therefore did not turn this into a real-time reaction test; latency affected runtime rather than the number of frames Mario moved while awaiting a decision.</p>
+<p><strong>Stopping limits per policy episode:</strong></p>
+<ul>
+<li>Maximum 100 decisions.</li>
+<li>Maximum 3,600 executed gameplay frames.</li>
+<li>Maximum 1,000,000 simulation frames.</li>
+<li>Maximum 1,200 wall-clock seconds.</li>
+<li>Stall threshold: 360 gameplay frames without a new best position.</li>
+<li>API timeout: 30 seconds per request.</li>
+</ul>
+<p><strong>Model sampling parameters.</strong> The harness did not send temperature, top-p, inference seed, or output limits to either service. Effective service defaults were unknown, so matching decoding behavior was not established. Emulator seeds control the environment; they are not model inference seeds.</p>
+<p><strong>Metrics.</strong> The primary outcome was stage-clear count: the emulator's completion flag, recorded as <code>reason: "completed"</code>. Secondary measures included death, stall and provider-error counts, best horizontal position, decisions per episode, simulation frames, and API latency. Decision count measures selection frequency; simulation frames measure emulator work. Neither is a substitute for dollar cost. Latency was observational because execution overlapped.</p>
+<p><strong>Software recorded with the runs.</strong> Python 3.13.16, <code>gym-super-mario-bros</code> 9.1.0, <code>nes-py</code> 9.0.1, <code>gymnasium</code> 1.4.0, NumPy 2.5.4, and <code>typesafe-sdk</code> 0.7.5. The source manifest records the application commit and the unresolved local-change caveat discussed below.</p>
 <h2>The final gameplay results</h2>
-<p>Each pairing ran ten episodes of <code>SuperMarioBros-1-1-v0</code>, using seeds 123–132. The returned model IDs were <code>jev-1.13.0</code>, <code>zoom-decisions</code>, and <code>zoom-decisions-pro</code>.</p>
-<p>All runs used native choice, the same seven actions, the same objective, no automatic follow-ups, and no survival guard. Limits were 100 decisions, 3,600 gameplay frames, 1,000,000 simulation frames, 1,200 wall-clock seconds per policy episode, and a 30-second API timeout. The stall threshold was 360 gameplay frames without a new best position.</p>
 <p>At the default depth, the result was a tie on completion:</p>
 <ul>
 <li><strong>Decisions: 10/10 clears. Jev: 10/10 clears.</strong></li>

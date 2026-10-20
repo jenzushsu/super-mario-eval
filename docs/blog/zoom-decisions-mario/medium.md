@@ -61,11 +61,36 @@ One integration regression also mattered: expanded instructions accompanied HTTP
 
 These changes were prompt and evidence engineering, not model-weight fine-tuning.
 
+## Benchmark design and parameters
+
+This was a custom, simulation-assisted benchmark on **Super Mario Bros. stage 1-1**, not an official Hugging Face benchmark. The final gameplay evaluation had four batches: Jev versus Decisions at depth 1 and depth 2, and Jev versus Decisions Pro at depth 1 and depth 2.
+
+**Sample size and environment.** Each batch contained ten episodes per model, using emulator seeds 123–132 in `SuperMarioBros-1-1-v0`. That produced 80 model-controlled episodes: 40 Jev, 20 Decisions, and 20 Pro. The search baseline ran another 40 episodes, reported separately. Different seeds on this fixed layout do not represent different levels or independently sampled tasks.
+
+**Models.** Jev was requested through `jev-latest`; responses identified **`jev-1.13.0`**. Jev 1.14.0 was not evaluated. Zoom was explicitly requested as **`zoom-decisions`** or **`zoom-decisions-pro`**, and the returned identifiers were checked. These service identifiers are not immutable weight snapshots.
+
+**Shared task and inputs.** Both services used native `choice` questions, the same objective, and the same seven action macros: `run`, `walk`, `jump`, `run_jump`, `hop`, `wait`, and `back`. The shared prompt was `outcome-ranker-v7`, the evidence format was `progress-cycles-v2`, and the action set was `simple-macros-v1`. Inputs described simulator-measured outcomes rather than screenshots. The final gameplay runs used independent parallel lanes: each model chose its own trajectory. After their choices diverged, their observations could differ. The earlier identical-state checkpoint tests were a separate diagnostic evaluation.
+
+**Simulation settings.** The candidate horizon was 48 frames, with a landing cap of 72 additional frames and 4 settling frames. Depth 1 tested a candidate plus one follow-up; depth 2 tested a candidate plus two follow-ups, using continuation set `all-seven-airborne-v2`. These settings were shared within each pairing. Simulation frames include hypothetical exploration and are distinct from executed gameplay frames.
+
+**Assistance and timing.** Survival guard, automatic escape, and automatic follow-up execution were all disabled. The emulator paused during inference and simulation. Parallel lanes therefore did not turn this into a real-time reaction test; latency affected runtime rather than the number of frames Mario moved while awaiting a decision.
+
+**Stopping limits per policy episode:**
+
+- Maximum 100 decisions.
+- Maximum 3,600 executed gameplay frames.
+- Maximum 1,000,000 simulation frames.
+- Maximum 1,200 wall-clock seconds.
+- Stall threshold: 360 gameplay frames without a new best position.
+- API timeout: 30 seconds per request.
+
+**Model sampling parameters.** The harness did not send temperature, top-p, inference seed, or output limits to either service. Effective service defaults were unknown, so matching decoding behavior was not established. Emulator seeds control the environment; they are not model inference seeds.
+
+**Metrics.** The primary outcome was stage-clear count: the emulator's completion flag, recorded as `reason: "completed"`. Secondary measures included death, stall and provider-error counts, best horizontal position, decisions per episode, simulation frames, and API latency. Decision count measures selection frequency; simulation frames measure emulator work. Neither is a substitute for dollar cost. Latency was observational because execution overlapped.
+
+**Software recorded with the runs.** Python 3.13.16, `gym-super-mario-bros` 9.1.0, `nes-py` 9.0.1, `gymnasium` 1.4.0, NumPy 2.5.4, and `typesafe-sdk` 0.7.5. The source manifest records the application commit and the unresolved local-change caveat discussed below.
+
 ## The final gameplay results
-
-Each pairing ran ten episodes of `SuperMarioBros-1-1-v0`, using seeds 123–132. The returned model IDs were `jev-1.13.0`, `zoom-decisions`, and `zoom-decisions-pro`.
-
-All runs used native choice, the same seven actions, the same objective, no automatic follow-ups, and no survival guard. Limits were 100 decisions, 3,600 gameplay frames, 1,000,000 simulation frames, 1,200 wall-clock seconds per policy episode, and a 30-second API timeout. The stall threshold was 360 gameplay frames without a new best position.
 
 At the default depth, the result was a tie on completion:
 
