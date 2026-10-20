@@ -147,7 +147,7 @@ comparison with this command (works in macOS/Linux shells and Windows PowerShell
 uv run --frozen --env-file .env mario-eval assisted --episodes 1 --max-decisions 100 --wall-seconds 600
 ```
 
-This loads `TYPESAFE_API_KEY` and `ZOOM_API_KEY` from `.env` and runs Jev, Zoom,
+This loads `TYPESAFE_API_KEY` and `ZOOM_ACCESS_TOKEN` from `.env` and runs Jev, standard Zoom Decisions,
 and the search baseline independently in parallel. Jev and Zoom appear side by
 side; the baseline is included in the report. Add `--headless` to run without a
 window. These limits allow a longer attempt but do not guarantee a level clear;
@@ -206,13 +206,21 @@ question by default, matching Jev's action-selection task. The response's explic
 choice is honored and its categorical probabilities are logged. To compare against
 the old independent-predicate setup, add `--zoom-question predicate` to either
 command. The setting is recorded in config.json. Direct control still uses predicates.
-See [Zoom formats](docs/zoom-api.md) for the supplied choice, predicate, score,
-and mixed-question contracts. Native choice gameplay improvement is not yet verified.
+See [Zoom formats](docs/zoom-api.md) for the released API reference and earlier
+choice, predicate, score, and mixed-question examples.
 
 ### Choose the Zoom model to compare against Jev
 
 For `assisted`, `realtime`, and `evaluate`, use `--zoom-model`. Jev keeps its
 `jev-latest` default; leave `--model` unset. Both services use native choice by default.
+
+| Comparison | Flag |
+| --- | --- |
+| Jev vs standard Decisions | `--zoom-model zoom-decisions` (default) |
+| Jev vs Decisions Pro | `--zoom-model zoom-decisions-pro` |
+
+Choose one Zoom model per run. `--zoom-question` selects the question format,
+not the model. These flags do not apply to the original direct-control command.
 
 In your local `.env`, set `TYPESAFE_API_KEY` and `ZOOM_ACCESS_TOKEN`. The documented
 Zoom API requires a bearer access token with `aiservices:write:decide:admin` and a
@@ -489,17 +497,20 @@ window, to exit. The window stays open when the decision limit is reached.
 
 ### 3. Configure the TypeSafe and Zoom secrets
 
-You need your own keys; the repository does not contain credentials:
+You need your own credentials; the repository does not contain secrets:
 
 | Variable | Credential required | Used for |
 | --- | --- | --- |
 | `TYPESAFE_API_KEY` | A TypeSafe API key with access to Jev/System One, obtained through your TypeSafe account or administrator | Requests to `api.typesafe.ai` through the TypeSafe SDK |
-| `ZOOM_API_KEY` | A key provisioned for Zoom AI Services **Decisions API**, obtained through your Zoom AI Services access provider or administrator | The `x-api-key` header on `https://api.zoom.us/v2/aiservices/decisions/decide` |
+| `ZOOM_ACCESS_TOKEN` | Zoom bearer access token with `aiservices:write:decide:admin` and AI Services or Universal SDK entitlement; Pro may need additional entitlement | `Authorization: Bearer ...` for assisted, realtime, and evaluate |
+| `ZOOM_API_KEY` | Optional legacy Decisions API key from the earlier sample access program | `x-api-key` fallback when no access token is set; required by the original direct controller |
 
-The supplied Zoom samples use an API key, not a Zoom meeting SDK credential or an
-OAuth client secret. A regular Zoom account alone does not establish Decisions
-API access. No public key-provisioning procedure was supplied with the samples;
-use the access channel that provided them if you do not yet have a key.
+Use an **access token**, not an OAuth client secret or meeting SDK credential.
+Obtain and refresh it through your Zoom OAuth setup; the runner does not refresh
+expired tokens. `ZOOM_ACCESS_TOKEN` takes precedence over `ZOOM_API_KEY` in the
+new comparison modes. The released reference documents bearer authentication;
+legacy API-key support is retained for existing users, not guaranteed for new accounts.
+See the [Zoom API reference](https://developers.zoom.us/docs/api/ai-services.md).
 
 Copy the template:
 
@@ -515,12 +526,12 @@ cp .env.example .env
 Copy-Item .env.example .env
 ```
 
-Open `.env` in your local editor and replace both placeholders with your actual
-keys. Keep the variable names exactly as shown:
+Open `.env` in your local editor. Uncomment/add `ZOOM_ACCESS_TOKEN`, replace
+the placeholders, and remove the unused legacy key line. Keep these names:
 
 ```dotenv
 TYPESAFE_API_KEY="replace_with_your_typesafe_key"
-ZOOM_API_KEY="replace_with_your_zoom_decisions_key"
+ZOOM_ACCESS_TOKEN="replace_with_your_zoom_access_token"
 ```
 
 `.env` is gitignored. Keep real keys out of `.env.example`, source files, commits,
@@ -535,13 +546,14 @@ values before testing.
 ### 4. Validate one live decision
 
 ```sh
-uv run --frozen --env-file .env mario-eval --headless --max-decisions 1
+uv run --frozen --env-file .env mario-eval assisted --zoom-model zoom-decisions --headless --max-decisions 1 --wall-seconds 120
 ```
 
-This makes a live request to each provider and may incur usage charges. A
-successful run prints summaries for both providers with `count: 1` and
-`error: null`, followed by the artifact directory. The Zoom text-only,
-seven-predicate request succeeded in user-supplied runs; verify access with your own key.
+This makes one live decision request per provider and includes the zero-API search
+baseline. It may incur usage charges. Check `summary.json` for provider errors and
+`zoom-001.jsonl` for the returned model. Repeat with
+`--zoom-model zoom-decisions-pro` to validate Pro access. A successful standard
+request does not establish Pro entitlement; API failures are not gameplay losses.
 
 ### 5. Open the live side-by-side comparison
 
@@ -551,9 +563,12 @@ For the **assisted comparison**, run:
 uv run --frozen --env-file .env mario-eval assisted --episodes 1 --max-decisions 100 --wall-seconds 600
 ```
 
-See [Assisted comparison](#assisted-comparison-new) for its budgets and reports.
+Add `--zoom-model zoom-decisions-pro` for Pro, or leave it unset for standard
+Decisions. See [model comparison commands](#choose-the-zoom-model-to-compare-against-jev)
+for matched five-run and identical-state evaluations.
 
-For the original **direct-control comparison**, run:
+For the original **direct-control comparison** (legacy `ZOOM_API_KEY` required;
+no Zoom model selector or bearer-token support), run:
 
 ```sh
 uv run --frozen --env-file .env mario-eval --max-decisions 250
@@ -578,8 +593,12 @@ check those files before treating a run as successful.
 
 - **Missing key:** run with `uv run --frozen --env-file .env ...`, from the project
   directory, and check the exact variable names and that placeholders are replaced.
-- **HTTP 401/403:** verify the key and service access with the relevant provider.
-  For Zoom, the key must authorize the Decisions endpoint specifically.
+- **HTTP 401/403:** verify token expiry, the `aiservices:write:decide:admin` scope,
+  and the required Zoom entitlement. Pro may require separate access. Check whether
+  a stale exported `ZOOM_ACCESS_TOKEN` is overriding your intended credentials.
+- **`model_mismatch`:** the response omitted the model or returned a different
+  variant. Check the requested model and account access; the runner never silently
+  falls back from Pro to standard Decisions.
 - **Connection error:** allow outbound HTTPS to `api.typesafe.ai` and `api.zoom.us`
   through your firewall or proxy. Keep TLS verification enabled.
 - **Zoom response validation error:** inspect the safe diagnostic in the run
