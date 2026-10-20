@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 from .simulation import rank_outcome
 
-PROMPT_VERSION = "outcome-ranker-v5"
+PROMPT_VERSION = "outcome-ranker-v6"
 OBJECTIVE = (
     "Choose the candidate that makes progress toward the flag without dying. "
     "Apply priorities in order: completion; survival with a viable next move; then progress. "
@@ -26,10 +26,18 @@ OBJECTIVE = (
     "Unknown outcomes are not evidence of death or safety. "
     "Use continuation_summary to distinguish complete, partial, and untested coverage. "
     "Prefer viable future moves over immediate distance alone; partial fatal follow-ups do not prove a trap. "
+    "An immediate clear completes the stage even when no follow-ups were tested and future progress is null. "
+    "Separate progress_summary.immediate_dx and immediate_endpoint_gain_beyond_best_x from hypothetical two-move progress. "
+    "Only immediate progress is achieved by this choice; future progress requires another decision and is not guaranteed. "
+    "When third_move_summary is present, use it to check survival through two hypothetical follow-up decisions. "
+    "Avoid a complete all-fatal third-move tree when another candidate has a surviving path; unknown paths are inconclusive. "
+    "Path counts are not survival probabilities. Terminal clear paths need no further moves. "
     "Among surviving routes, compare progress_summary.best_surviving_two_move_dx and gain_beyond_best_x. "
     "A smaller first move with forward surviving follow-ups can beat a larger move that leaves only waiting or retreat. "
     "Null progress means untested or no observed surviving continuation, not zero progress or proven death. "
     "Use recent_decisions and prior_attempts_without_new_best to avoid repeating an unproductive area/action cycle. "
+    "When repeated waits or movement attempts gain no new ground, prefer an immediately advancing viable alternative over deferring the same progress again. "
+    "Do not sacrifice survival for immediate distance; useful waits and retreats remain valid. "
     "Area matches are approximate: enemies and timing can change; do not ban useful waits or retreats. "
     "Use history to recognize repeated no-progress actions, while allowing useful waits and retreats. "
     "Only your chosen move executes; follow-ups are hypothetical and must be selected on a later decision."

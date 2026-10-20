@@ -71,7 +71,7 @@ def test_negative_or_unsupported_settings_rejected():
     with pytest.raises(ValueError):
         SimulationConfig(horizon=1)
     with pytest.raises(ValueError):
-        SimulationConfig(continuation_depth=2)
+        SimulationConfig(continuation_depth=3)
 
 
 def test_history_is_restored_and_reconstructed_from_controls(sim):

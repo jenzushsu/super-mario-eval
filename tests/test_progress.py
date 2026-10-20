@@ -101,3 +101,79 @@ def test_unknown_untested_and_retreat_progress_are_not_zero_or_guaranteed_safe()
     assert actual["best_surviving_two_move_dx"] == 40
     assert actual["gain_beyond_best_x"] == 20
     assert actual["best_surviving_followups"] == ["hop"]
+
+
+def test_immediate_clear_and_deferred_progress_are_distinct():
+    state = {"x": 100, "best_x": 100}
+    waiting = {
+        "status": "alive",
+        "dx": 0,
+        "x_after": 100,
+        "continuations": [{"id": "jump", "status": "alive", "dx": 80}],
+    }
+    p = progress_summary(waiting, state, [], "wait")
+    assert p["immediate_dx"] == p["immediate_endpoint_gain_beyond_best_x"] == 0
+    assert p["best_surviving_two_move_dx"] == 80
+    clear = {"status": "clear", "dx": 1, "x_after": 101, "continuations": []}
+    p = progress_summary(clear, state, [], "jump")
+    assert p["immediate_completes_stage"]
+    assert p["best_surviving_two_move_dx"] is None
+
+
+def test_three_move_evidence_exposes_wait_before_uploaded_trap():
+    from mario_eval.simulation import BudgetStop
+
+    case = json.loads((Path(__file__).parent / "fixtures/targeted_progress_trap.json").read_text())[
+        "pro-d16"
+    ]
+    sim = MarioSimulator(seed=case["seed"])
+    config = SimulationConfig(continuation_depth=2)
+    try:
+        reconstruct_prefix(sim, case, config, budget())
+        assert sim.digest() == case["digest"]
+        history = copy.deepcopy(sim.recent_decisions)
+        outcomes = sim.explore(config, budget())
+        assert sim.digest() == case["digest"]
+        assert sim.recent_decisions == history
+        assert outcomes["walk"]["status"] == "alive"
+        assert outcomes["walk"]["third_move_summary"]["all_tested_paths_fatal"]
+        wait = outcomes["wait"]["third_move_summary"]
+        assert wait["surviving_paths"] == 7
+        assert wait["best_surviving_three_move_dx"] == 176
+        assert ["walk", "run_jump"] in wait["best_surviving_followup_sequences"]
+        assert [k for k, v in outcomes.items() if v["third_move_summary"]["surviving_paths"]] == [
+            "wait"
+        ]
+        shallow = sim.explore(SimulationConfig(), budget())
+        for name in outcomes:
+            assert {
+                k: v for k, v in outcomes[name].items() if k != "third_move_summary"
+            } == shallow[name]
+        canonical = canonical_state(sim, outcomes, config)
+        assert payload_for("jev", canonical)["state"] == json.loads(
+            payload_for("zoom", canonical)["input"]
+        )
+        with pytest.raises(BudgetStop):
+            sim.explore(config, WorkBudget(100, time.monotonic() + 120))
+        assert sim.digest() == case["digest"]
+    finally:
+        sim.close()
+
+
+def test_uploaded_stall_distinguishes_wait_from_actual_progress():
+    case = json.loads((Path(__file__).parent / "fixtures/targeted_progress_trap.json").read_text())[
+        "jev-stall-d36"
+    ]
+    sim = MarioSimulator(seed=case["seed"])
+    config = SimulationConfig()
+    try:
+        reconstruct_prefix(sim, case, config, budget())
+        c = canonical_state(sim, sim.explore(config, budget()), config)
+        wait = c["outcomes"]["wait"]["progress_summary"]
+        jump = c["outcomes"]["run_jump"]["progress_summary"]
+        assert wait["immediate_dx"] == 0
+        assert wait["best_surviving_two_move_dx"] == 88
+        assert jump["immediate_dx"] == 88
+        assert not wait["immediate_completes_stage"]
+    finally:
+        sim.close()

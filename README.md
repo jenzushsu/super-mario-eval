@@ -310,9 +310,45 @@ Defaults per policy/episode: `--max-decisions 25`, `--game-frames 3600`,
 A stall means no new best position within the configured actual frame interval.
 Simulation can take much longer than the resulting gameplay; its status is visible.
 
+### Targeted progress and deeper-lookahead experiment
+
+The v6 prompt and `progress-cycles-v2` evidence separate immediate displacement,
+immediate endpoint gain, and immediate completion from hypothetical follow-up
+progress. A zero-progress move does not earn actual progress merely because a later
+jump could advance. Survival still takes priority, and waits/retreats remain valid.
+
+`--depth 1` remains the default (candidate plus one follow-up). Optional `--depth 2`
+tests two follow-ups, up to three moves in total. Compact `third_move_summary` fields
+report surviving/fatal/unknown paths, completions, best total displacement, and
+follow-up sequences. Terminal paths stop early. Counts are not probabilities;
+unknown outcomes are not treated as safe or fatal. Exploration restores the original
+state and history. No follow-up executes automatically, and the survival guard still
+uses its original one-follow-up rule.
+
+The extra horizon exposed a trap at x=1823 in the targeted Pro recording: `walk`
+has no surviving three-move route, while `wait` has seven. This is simulator evidence,
+not a measured model improvement or guarantee of eventual completion.
+
+Compare updated evidence at depth 1 against depth 2 on the **same starting
+checkpoints**, with both providers receiving the same depth. For `evaluate`, depth
+comes from the saved corpus; passing `--depth 2` does not change an existing corpus.
+For new captures or gameplay, explicitly use `--depth 2`, for example:
+
+```sh
+uv run --frozen mario-eval capture --depth 2 --max-decisions 12 --headless --simulation-frames 1000000 --wall-seconds 1200
+uv run --frozen --env-file .env mario-eval assisted --zoom-model zoom-decisions-pro --depth 2 --episodes 10 --max-decisions 100 --simulation-frames 1000000 --wall-seconds 1200 --headless
+```
+
+Use identical budgets for standard Decisions, Pro, and their Jev comparisons. Extra
+lookahead costs more simulation and can increase API input size; report those costs.
+Keep the earlier v5 results unchanged. Old corpora are rejected by v2 evaluation;
+recapture or explicitly reconstruct their prefixes into new versioned corpora.
+Targeted failure cases are development data, not held-out evidence of generalization.
+See [the investigation and validation plan](docs/targeted-investigation.md).
+
 ### Shared history and continuation evidence
 
-Both providers receive the same `outcome-ranker-v5` instructions and fields:
+Both providers receive the same `outcome-ranker-v6` instructions and fields:
 
 - `history.recent_controls`: the last eight groups of actual controller buttons,
   with their frame counts and displacement. These are executed controls, not
@@ -394,7 +430,7 @@ input position, not progress achieved by a provider.
 
 ### Compare decisions on identical states
 
-**Recapture corpora without `evidence_version: progress-cycles-v1`.** The new
+**Recapture corpora without `evidence_version: progress-cycles-v2`.** The new
 evidence includes decision history and two-move progress. Evaluation reconstructs
 retained macro boundaries and outcomes from prefix controls, and rejects stale or
 altered history. Old episode logs still support replay; they do not silently acquire

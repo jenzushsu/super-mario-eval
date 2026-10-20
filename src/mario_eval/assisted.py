@@ -864,7 +864,7 @@ def main(argv):
     parser.add_argument("--horizon", type=positive, default=48)
     parser.add_argument("--landing-cap", type=int, default=72)
     parser.add_argument("--settle", type=int, default=4)
-    parser.add_argument("--depth", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--depth", type=int, choices=(0, 1, 2), default=1)
     parser.add_argument(
         "--model",
         default="jev-latest",

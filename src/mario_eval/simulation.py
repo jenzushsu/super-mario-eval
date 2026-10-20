@@ -14,7 +14,7 @@ from typesafe_mario.actions import ACTION_TO_INDEX, Action
 from typesafe_mario.runner import create_mario_env
 
 ACTION_SET = "simple-macros-v1"
-EVIDENCE_VERSION = "progress-cycles-v1"
+EVIDENCE_VERSION = "progress-cycles-v2"
 CANDIDATES = ("run", "walk", "jump", "run_jump", "hop", "wait", "back")
 FOLLOW_UPS = CANDIDATES
 
@@ -32,8 +32,8 @@ class SimulationConfig:
             raise ValueError("Unsupported continuation set")
         if self.horizon < 40 or self.landing_cap < 0 or self.settle < 0:
             raise ValueError("horizon must be >=40; landing cap and settle must be nonnegative")
-        if self.continuation_depth not in (0, 1):
-            raise ValueError("Supported continuation depths: 0 or 1")
+        if self.continuation_depth not in (0, 1, 2):
+            raise ValueError("Supported continuation depths: 0, 1 or 2")
 
 
 class BudgetStop(RuntimeError):
@@ -321,6 +321,7 @@ class MarioSimulator:
                 self.restore(root)
                 outcome = self.execute(candidate, config, before_step=budget.step)
                 outcome["continuations"] = []
+                third_paths = []
                 expandable = outcome["status"] == "alive" or (
                     outcome["status"] == "unknown"
                     and not self.done
@@ -331,15 +332,63 @@ class MarioSimulator:
                     for follow in FOLLOW_UPS:
                         self.restore(endpoint)
                         continuation = self.execute(follow, config, before_step=budget.step)
+                        if config.continuation_depth == 2:
+                            expandable_follow = continuation["status"] == "alive" or (
+                                continuation["status"] == "unknown"
+                                and not self.done
+                                and config.continuation_set == "all-seven-airborne-v2"
+                            )
+                            if expandable_follow:
+                                second_endpoint = self.checkpoint()
+                                for third in FOLLOW_UPS:
+                                    self.restore(second_endpoint)
+                                    leaf = self.execute(third, config, before_step=budget.step)
+                                    third_paths.append(
+                                        {
+                                            "moves": [follow, third],
+                                            "status": leaf["status"],
+                                            "dx": outcome["dx"] + continuation["dx"] + leaf["dx"],
+                                        }
+                                    )
+                            else:
+                                third_paths.append(
+                                    {
+                                        "moves": [follow],
+                                        "status": continuation["status"],
+                                        "dx": outcome["dx"] + continuation["dx"],
+                                    }
+                                )
                         outcome["continuations"].append(
                             {k: continuation[k] for k in ("id", "status", "dx", "frames")}
                         )
+                if config.continuation_depth == 2:
+                    outcome["third_move_summary"] = third_move_summary(outcome, third_paths)
                 outcomes[candidate] = outcome
         finally:
             self.restore(root)
         if self.digest() != root_digest:
             raise RuntimeError("Snapshot exploration changed the starting state")
         return {candidate: outcomes[candidate] for candidate in CANDIDATES if candidate in outcomes}
+
+
+def third_move_summary(outcome, paths):
+    """Compact exhaustive tree leaves; terminal branches stop before move three."""
+    if not paths:
+        paths = [{"moves": [], "status": outcome["status"], "dx": outcome["dx"]}]
+    surviving = [p for p in paths if p["status"] in ("alive", "clear")]
+    best = max((p["dx"] for p in surviving), default=None)
+    return {
+        "coverage": "complete" if outcome["continuations"] else "terminal_or_unexpanded",
+        "tested_paths": len(paths),
+        "surviving_paths": len(surviving),
+        "unknown_paths": sum(p["status"] == "unknown" for p in paths),
+        "fatal_paths": sum(p["status"] == "dead" for p in paths),
+        "clear_paths": sum(p["status"] == "clear" for p in paths),
+        "best_surviving_three_move_dx": best,
+        "best_surviving_followup_sequences": [p["moves"] for p in surviving if p["dx"] == best],
+        "surviving_first_followups": sorted({p["moves"][0] for p in surviving if p["moves"]}),
+        "all_tested_paths_fatal": all(p["status"] == "dead" for p in paths),
+    }
 
 
 def canonical_state(sim, outcomes, config):
@@ -375,6 +424,11 @@ def canonical_state(sim, outcomes, config):
         },
         "outcomes": {
             name: {
+                **(
+                    {"third_move_summary": value["third_move_summary"]}
+                    if "third_move_summary" in value
+                    else {}
+                ),
                 "continuation_summary": continuation_summary(value),
                 "progress_summary": progress_summary(
                     value, sim.state(), sim.recent_decisions, name
@@ -415,6 +469,11 @@ def progress_summary(outcome, state, decisions, candidate):
         if d["complete"] and d["candidate"] == candidate and same_area(state, d["before"])
     ]
     return {
+        "immediate_dx": outcome["dx"],
+        "immediate_endpoint_x": outcome["x_after"],
+        "immediate_endpoint_gain_beyond_best_x": max(0, outcome["x_after"] - state["best_x"]),
+        "immediate_completes_stage": outcome["status"] == "clear",
+        "followup_progress_is_hypothetical": True,
         "best_surviving_two_move_dx": None
         if best_follow_dx is None
         else outcome["dx"] + best_follow_dx,
