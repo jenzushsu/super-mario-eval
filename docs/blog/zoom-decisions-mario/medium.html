@@ -1,6 +1,6 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Can Zoom Decisions Get Mario to the Flag?</title><style>body{max-width:760px;margin:48px auto;padding:0 24px;font:20px/1.6 Georgia,serif;color:#222}img{max-width:100%}h1,h2{line-height:1.2}a{color:#155ea0}code{font-size:.85em}</style></head><body>
-<h1>Can Zoom Decisions Get Mario to the Flag?</h1>
+<html lang="en"><head><meta charset="utf-8"><title>Seven Moves, One Flag: Putting Zoom Decisions to the Mario Test</title><style>body{max-width:760px;margin:48px auto;padding:0 24px;font:20px/1.6 Georgia,serif;color:#222}img{max-width:100%}h1,h2{line-height:1.2}a{color:#155ea0}code{font-size:.85em}</style></head><body>
+<h1>Seven Moves, One Flag: Putting Zoom Decisions to the Mario Test</h1>
 <p><em>Testing Decisions and Decisions Pro against TypeSafe Jev—and what the failures taught us about giving models better evidence.</em></p>
 <p>A decision API returns a small answer. In a game, that answer can have a very visible consequence: Mario advances, stalls, or falls into a pit.</p>
 <p>We built a Super Mario Bros. stage-1-1 experiment around Zoom Decisions API to explore that connection. In the final default-depth evaluation, <strong>Zoom Decisions and Decisions Pro each cleared the stage in all 10 episodes, without a survival guard</strong>. TypeSafe Jev, our comparison model, also cleared all 10 episodes in each pairing.</p>
@@ -67,7 +67,8 @@
 <p>There were no model-controlled deaths or API failures in these final batches. The one unsuccessful Jev episode stalled. The deterministic search baseline stalled in all 40 of its episodes; it retained its original selection rule and did not use the new third-move summary for scoring.</p>
 <p>Here, a clear means the emulator reported reaching the flag and completing <strong>stage 1-1</strong>, not finishing every level of Super Mario Bros. The corresponding report field is <code>reason: "completed"</code>.</p>
 <p><a href="https://github.com/jenzushsu/super-mario-eval/blob/main/docs/blog/zoom-decisions-mario/assets/decisions-stage-1-1-replay.mp4">Watch an annotated standard-Decisions clear</a>. This is a verified replay of recorded controller inputs, with simulation and API waiting time omitted. It is not a live-latency demonstration. On-screen labels show the recorded model-selected move.</p>
-<p><a href="https://github.com/jenzushsu/super-mario-eval/blob/main/docs/blog/zoom-decisions-mario/assets/decisions-stage-1-1-replay.mp4"><img alt="Annotated replay showing the selected action above the game" src="assets/replay-preview.png" /></a></p>
+<p><img alt="Recorded standard-Decisions stage clear, with action labels and API waits omitted." src="assets/decisions-stage-1-1-replay.gif" /></p>
+<p><em>Recorded standard-Decisions replay. Simulation and API waiting time omitted; this is not real-time playback.</em></p>
 <h2>Is deeper lookahead worth it?</h2>
 <p>On this stage, depth 1 already achieved 10/10 for both Zoom variants. Depth 2 reduced average decisions from 32.3 to 30.3 for standard Decisions and from 33.7 to 29.0 for Pro. But it required approximately 5.8× and 5.3× as many simulation frames, respectively.</p>
 <p><img alt="Two panels comparing average model decisions and simulation frames: deeper lookahead reduced decision counts but required 5.8 times the simulation for Decisions and 5.3 times for Pro." src="assets/lookahead-tradeoff.png" /></p>

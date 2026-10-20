@@ -7,6 +7,7 @@ Status: draft for author review. The blog has not been published to an external 
 - [Article](article.md): approximately 1,600 words; integration, investigation, final outcomes, and limitations.
 - [Results CSV](results.csv): eight provider rows, keeping each Jev pairing separate.
 - [Source manifest](source-manifest.json): run IDs and hashes for uploaded configurations and summaries.
+- [Animated GIF](assets/decisions-stage-1-1-replay.gif): complete replay at 480 pixels wide and 10 fps, looping with the original timing and on-screen labels. Upload directly as an image in the Medium results section.
 - [Annotated replay](assets/decisions-stage-1-1-replay.mp4): standard Decisions, depth 1, seed 123, episode 1; 32 decisions and 1,822 gameplay frames, verified against recorded state digests.
 - [Replay manifest](assets/replay-manifest.json): source-log hash and playback details.
 

@@ -1,4 +1,4 @@
-# From API to flag: testing Zoom Decisions with Super Mario
+# Seven Moves, One Flag: Putting Zoom Decisions to the Mario Test
 
 A decision API returns a small answer. In a game, that answer can have a very visible consequence: Mario advances, stalls, or falls into a pit.
 
@@ -140,7 +140,9 @@ Here, a clear means the emulator reported reaching the flag and completing **sta
 
 [Watch an annotated standard-Decisions clear](assets/decisions-stage-1-1-replay.mp4). This is a verified replay of recorded controller inputs, with simulation and API waiting time omitted. It is not a live-latency demonstration. On-screen labels show the recorded model-selected move.
 
-[![Annotated replay showing the selected action above the game](assets/replay-preview.png)](assets/decisions-stage-1-1-replay.mp4)
+![Recorded standard-Decisions stage clear, with action labels and API waits omitted.](assets/decisions-stage-1-1-replay.gif)
+
+*Recorded standard-Decisions replay. Simulation and API waiting time omitted; this is not real-time playback.*
 
 ## Is deeper lookahead worth it?
 
