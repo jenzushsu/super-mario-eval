@@ -127,6 +127,21 @@ That makes depth 1 the practical baseline for this task. Pro used the fewest dec
 
 Median recorded API latency was about 1.13 seconds for standard Decisions and 1.42 seconds for Pro in their depth-1 batches. These are observations from this setup, not service benchmarks: batch timing indicates overlapping execution, which may affect latency and runtime. We recorded usage but did not establish monetary cost. Fewer decisions do not necessarily mean lower cost, because request size, caching, and pricing also matter.
 
+## What about cost?
+
+Completion rate is only part of the decision. For a practical deployment, we also need to know what each successful outcome costs.
+
+This experiment did **not establish dollar costs**, so it cannot identify the cheapest model. Usage was recorded, but we have not reconciled complete per-run usage with verified pricing for each service, including cached-input rates and any applicable account terms.
+
+There are two costs to separate:
+
+- **API cost:** billable input and output usage across every request, including any billable retries or failed attempts. Request count alone is insufficient: longer evidence can increase input usage, caching can change charges, and standard and Pro may have different rates.
+- **Simulation cost:** the CPU time and infrastructure used to generate candidate outcomes. Deeper lookahead required roughly five to six times as many simulation frames here. That is extra emulator work, not a measured five-to-sixfold increase in dollars.
+
+A useful follow-up would report total API spend, simulation compute cost, and **cost per successful stage clear** alongside completion rate. Cost per clear should divide the total cost of the entire batch—including unsuccessful episodes—by the number of clears. If a batch has no clears, that metric is undefined rather than zero.
+
+At depth 1, both Zoom variants cleared all ten episodes. Pro therefore showed no additional completion benefit in that batch to weigh against any price difference. At depth 2, Pro used fewer decisions, but that alone does not establish lower cost or better value. A cost recommendation needs the billing evidence as well as the gameplay results.
+
 ## What this experiment establishes
 
 Zoom Decisions API worked as a structured action selector in this simulation-assisted setup. Both variants completed every final Zoom episode, and controlled checkpoint tests helped reveal where better evidence could change choices.

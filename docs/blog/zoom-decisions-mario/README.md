@@ -2,6 +2,8 @@
 
 Status: draft for author review. The blog has not been published to an external site.
 
+- [Medium-ready article](medium.md): prose and captions adapted for Medium, with a separate cost discussion.
+- [Browser copy](medium.html): open locally and copy the rendered article into a Medium draft. Upload the PNG images separately and retain their captions; the replay link can remain a link or be replaced with a hosted-video embed.
 - [Article](article.md): approximately 1,600 words; integration, investigation, final outcomes, and limitations.
 - [Results CSV](results.csv): eight provider rows, keeping each Jev pairing separate.
 - [Source manifest](source-manifest.json): run IDs and hashes for uploaded configurations and summaries.
